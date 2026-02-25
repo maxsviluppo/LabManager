@@ -1,0 +1,5 @@
+{
+  "name": "LabManager - Gestione Laboratori",
+  "description": "Un'applicazione semplice e veloce per gestire l'inventario dei materiali e la contabilità economica dei laboratori scolastici.",
+  "requestFramePermissions": []
+}
