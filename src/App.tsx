@@ -1437,7 +1437,7 @@ export default function App() {
 
       {/* Tutorial Modal */}
       <Modal show={showTutorial} onClose={() => setShowTutorial(false)} title="📖 Tutorial LabManager">
-        <div className="space-y-6 py-2">
+        <div className="space-y-6 py-2 max-h-[70vh] overflow-y-auto pr-2 scrollbar-thin">
           <section className="space-y-3">
             <h4 className="font-black text-sage-600 flex items-center gap-2 italic">1. Creare un Laboratorio</h4>
             <p className="text-sm text-warm-700">Inizia dalla Home cliccando su <strong>"Nuovo Lab"</strong>. Assegna un nome e una descrizione. Ogni lab è un'unità di produzione indipendente.</p>
