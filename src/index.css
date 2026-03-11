@@ -1,21 +1,453 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800;900&family=DM+Sans:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-  
-  --color-brand-primary: #10b981;
-  --color-brand-secondary: #3b82f6;
-  --color-brand-accent: #f59e0b;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Nunito", ui-sans-serif, system-ui, sans-serif;
+
+  /* Sage Green Palette */
+  --color-sage-50:  #f2f7f4;
+  --color-sage-100: #e0eee6;
+  --color-sage-200: #c2dccf;
+  --color-sage-300: #97c3ab;
+  --color-sage-400: #67a483;
+  --color-sage-500: #4a8a68;
+  --color-sage-600: #3a7055;
+  --color-sage-700: #2f5a45;
+  --color-sage-800: #274939;
+  --color-sage-900: #213c30;
+
+  /* Soft Rose Accent */
+  --color-blush-50:  #fdf4f4;
+  --color-blush-100: #fce8e8;
+  --color-blush-200: #f8d0d0;
+  --color-blush-300: #f0a9a9;
+  --color-blush-400: #e57e7e;
+  --color-blush-500: #d95f5f;
+  --color-blush-600: #c44545;
+
+  /* Warm Neutrals */
+  --color-warm-50:  #faf9f7;
+  --color-warm-100: #f3f1ed;
+  --color-warm-200: #e8e3db;
+  --color-warm-300: #d5cdc0;
+  --color-warm-400: #b8ab99;
+  --color-warm-500: #9a8d7c;
+  --color-warm-600: #7e7263;
+  --color-warm-700: #655b4e;
+  --color-warm-800: #4e463c;
+  --color-warm-900: #363028;
 }
 
 @layer base {
-  body {
-    @apply font-sans bg-slate-50 text-slate-900;
+  html {
+    scroll-behavior: smooth;
   }
+  body {
+    font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+    background-color: #f7f6f3;
+    color: #363028;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: "Nunito", ui-sans-serif, system-ui, sans-serif;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #c2dccf; border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: #97c3ab; }
 }
 
+/* === CARD STYLES === */
+
 .glass-card {
-  @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-sm rounded-2xl;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(194, 220, 207, 0.4);
+  border-radius: 20px;
+  box-shadow: 0 2px 16px rgba(74, 138, 104, 0.06), 0 1px 4px rgba(74, 138, 104, 0.04);
+  transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
+}
+.glass-card:hover {
+  box-shadow: 0 8px 32px rgba(74, 138, 104, 0.12), 0 2px 8px rgba(74, 138, 104, 0.08);
+  border-color: rgba(151, 195, 171, 0.5);
+}
+
+.soft-card {
+  background: linear-gradient(135deg, #ffffff 0%, #f7f9f8 100%);
+  border: 1px solid #e0eee6;
+  border-radius: 18px;
+  box-shadow: 0 1px 8px rgba(74, 138, 104, 0.06);
+}
+
+/* === BUTTON STYLES === */
+
+.btn-primary {
+  background: linear-gradient(135deg, #4a8a68 0%, #3a7055 60%, #2f5a45 100%);
+  color: white;
+  border-radius: 14px;
+  font-family: "Nunito", sans-serif;
+  font-weight: 700;
+  font-size: 0.9rem;
+  letter-spacing: 0.01em;
+  padding: 12px 24px;
+  box-shadow: 0 4px 16px rgba(74, 138, 104, 0.35), 0 1px 4px rgba(74, 138, 104, 0.2);
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+.btn-primary::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.18) 0%, transparent 60%);
+  pointer-events: none;
+}
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(74, 138, 104, 0.45), 0 2px 8px rgba(74, 138, 104, 0.25);
+}
+.btn-primary:active { transform: translateY(0) scale(0.98); }
+
+.btn-secondary {
+  background: linear-gradient(135deg, #ffffff 0%, #f2f7f4 100%);
+  color: #3a7055;
+  border: 1.5px solid #c2dccf;
+  border-radius: 14px;
+  font-family: "Nunito", sans-serif;
+  font-weight: 700;
+  font-size: 0.9rem;
+  padding: 11px 22px;
+  box-shadow: 0 2px 8px rgba(74, 138, 104, 0.08);
+  transition: all 0.2s ease;
+}
+.btn-secondary:hover {
+  background: linear-gradient(135deg, #e0eee6 0%, #f2f7f4 100%);
+  border-color: #97c3ab;
+  transform: translateY(-1px);
+}
+.btn-secondary:active { transform: translateY(0) scale(0.98); }
+
+.btn-danger {
+  background: linear-gradient(135deg, #e57e7e 0%, #c44545 100%);
+  color: white;
+  border-radius: 14px;
+  font-family: "Nunito", sans-serif;
+  font-weight: 700;
+  font-size: 0.9rem;
+  padding: 12px 24px;
+  box-shadow: 0 4px 16px rgba(197, 69, 69, 0.3);
+  transition: all 0.2s ease;
+}
+.btn-danger:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(197, 69, 69, 0.4); }
+.btn-danger:active { transform: translateY(0) scale(0.98); }
+
+.btn-ghost {
+  background: transparent;
+  color: #655b4e;
+  border: none;
+  border-radius: 12px;
+  font-family: "Nunito", sans-serif;
+  font-weight: 600;
+  padding: 8px 12px;
+  transition: all 0.15s ease;
+}
+.btn-ghost:hover { background: #f2f7f4; color: #3a7055; }
+
+/* === APP BACKGROUND === */
+
+.app-bg {
+  background: 
+    radial-gradient(ellipse 60% 40% at 10% 0%, rgba(194, 220, 207, 0.18) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 50% at 90% 100%, rgba(194, 220, 207, 0.14) 0%, transparent 60%),
+    #f7f6f3;
+  min-height: 100dvh;
+}
+
+/* === SIDEBAR === */
+
+.sidebar {
+  background: linear-gradient(180deg, #ffffff 0%, #f7f9f8 100%);
+  border-right: 1px solid #e0eee6;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+  border-radius: 14px;
+  font-family: "Nunito", sans-serif;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #7e7263;
+  transition: all 0.18s ease;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+}
+.nav-item:hover {
+  background: #f2f7f4;
+  color: #3a7055;
+}
+.nav-item.active {
+  background: linear-gradient(135deg, #e0eee6 0%, #f2f7f4 100%);
+  color: #2f5a45;
+  box-shadow: inset 0 0 0 1.5px rgba(74, 138, 104, 0.18);
+}
+
+/* === LOGO / BRAND === */
+
+.brand-logo {
+  background: linear-gradient(135deg, #4a8a68 0%, #3a7055 100%);
+  border-radius: 14px;
+  padding: 10px;
+  box-shadow: 0 4px 12px rgba(74, 138, 104, 0.3);
+}
+
+/* === STAT CARDS === */
+
+.stat-card {
+  background: linear-gradient(135deg, #ffffff 0%, #f7f9f8 100%);
+  border: 1px solid #e0eee6;
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 2px 12px rgba(74, 138, 104, 0.06);
+  transition: all 0.25s ease;
+  overflow: hidden;
+  position: relative;
+}
+.stat-card::after {
+  content: '';
+  position: absolute;
+  top: 0; right: 0;
+  width: 80px; height: 80px;
+  background: radial-gradient(circle, rgba(74, 138, 104, 0.07) 0%, transparent 70%);
+  border-radius: 0 18px 0 100%;
+}
+.stat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(74, 138, 104, 0.12); }
+
+.stat-card.highlight {
+  background: linear-gradient(135deg, #2f5a45 0%, #3a7055 50%, #4a8a68 100%);
+  border-color: transparent;
+  box-shadow: 0 6px 24px rgba(47, 90, 69, 0.35);
+  color: white;
+}
+
+/* === INPUTS === */
+
+.form-input {
+  width: 100%;
+  background: #ffffff;
+  border: 1.5px solid #e0eee6;
+  border-radius: 12px;
+  padding: 11px 16px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.9rem;
+  color: #363028;
+  transition: all 0.18s ease;
+  outline: none;
+}
+.form-input:focus {
+  border-color: #67a483;
+  box-shadow: 0 0 0 3px rgba(74, 138, 104, 0.12);
+}
+.form-input::placeholder { color: #b8ab99; }
+
+.form-label {
+  display: block;
+  font-family: "Nunito", sans-serif;
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: #655b4e;
+  margin-bottom: 6px;
+  letter-spacing: 0.02em;
+}
+
+/* === BADGES === */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 99px;
+  font-family: "Nunito", sans-serif;
+  font-weight: 800;
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.badge-green { background: #e0eee6; color: #2f5a45; border: 1px solid #c2dccf; }
+.badge-rose  { background: #fce8e8; color: #c44545; border: 1px solid #f8d0d0; }
+.badge-amber { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+
+/* === SEARCH === */
+
+.search-box {
+  position: relative;
+}
+.search-box input {
+  width: 100%;
+  background: rgba(255,255,255,0.9);
+  border: 1.5px solid #e0eee6;
+  border-radius: 14px;
+  padding: 11px 16px 11px 42px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.9rem;
+  color: #363028;
+  outline: none;
+  transition: all 0.18s ease;
+}
+.search-box input:focus {
+  border-color: #67a483;
+  box-shadow: 0 0 0 3px rgba(74, 138, 104, 0.1);
+  background: white;
+}
+.search-box .icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #97c3ab;
+  pointer-events: none;
+}
+
+/* === PROGRESS BAR === */
+
+.progress-track {
+  background: #e0eee6;
+  border-radius: 99px;
+  height: 6px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #4a8a68, #67a483);
+  transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.progress-fill.danger {
+  background: linear-gradient(90deg, #e57e7e, #c44545);
+}
+
+/* === LIST ITEM === */
+
+.list-item {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #f2f7f4;
+  transition: background 0.15s ease;
+}
+.list-item:last-child { border-bottom: none; }
+.list-item:hover { background: #f7f9f8; }
+
+/* === MODAL === */
+
+.modal-overlay {
+  background: rgba(36, 34, 29, 0.45);
+  backdrop-filter: blur(6px);
+}
+.modal-panel {
+  background: linear-gradient(135deg, #ffffff 0%, #f7f9f8 100%);
+  border: 1px solid #e0eee6;
+  border-radius: 24px;
+  box-shadow: 0 20px 60px rgba(47, 90, 69, 0.18), 0 4px 16px rgba(0,0,0,0.08);
+}
+
+/* === ANIMATIONS === */
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes pulse-ring {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(74, 138, 104, 0.25); }
+  50%       { box-shadow: 0 0 0 8px rgba(74, 138, 104, 0); }
+}
+
+.animate-fade-up { animation: fade-up 0.35s ease both; }
+.animate-scale-in { animation: scale-in 0.25s ease both; }
+.animate-shimmer {
+  background: linear-gradient(90deg, #f2f7f4 0%, #e0eee6 50%, #f2f7f4 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease infinite;
+}
+
+/* === TOP BAR (mobile) === */
+
+.top-bar {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid #e0eee6;
+}
+
+/* === DIVIDER === */
+.divider { border: none; border-top: 1px solid #e8e3db; margin: 0; }
+
+/* === TABLES === */
+
+.tbl th {
+  background: #f2f7f4;
+  font-family: "Nunito", sans-serif;
+  font-weight: 800;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #655b4e;
+  padding: 14px 16px;
+}
+.tbl td { padding: 14px 16px; font-size: 0.9rem; color: #4e463c; vertical-align: middle; }
+.tbl tr:hover td { background: #f7f9f8; }
+
+/* === LOGOUT === */
+
+.logout-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #b8ab99;
+  font-family: "Nunito", sans-serif;
+  font-weight: 700;
+  font-size: 0.8rem;
+  padding: 6px 12px;
+  border-radius: 10px;
+  transition: all 0.18s ease;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.logout-btn:hover {
+  background: #fce8e8;
+  color: #c44545;
+}
+
+/* === SECTION HEADER === */
+.section-title {
+  font-family: "Nunito", sans-serif;
+  font-weight: 900;
+  font-size: 1.75rem;
+  color: #363028;
+  letter-spacing: -0.02em;
+}
+.section-subtitle {
+  font-size: 0.9rem;
+  color: #9a8d7c;
+  font-weight: 400;
+  margin-top: 2px;
 }

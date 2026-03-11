@@ -78,14 +78,27 @@ app.post("/api/auth/login", wrap(async (req, res) => {
 
 app.post("/api/auth/register", wrap(async (req, res) => {
   const { username, password } = req.body;
+  if (!username || !password) return res.status(400).json({ error: "Username e password richiesti" });
+  
   const sql = getSql();
-  const existing = await sql`SELECT 1 FROM users WHERE username = ${username}`;
+  const existing = await sql`SELECT 1 FROM users WHERE username = ${username} LIMIT 1`;
   if (existing.length > 0) return res.status(400).json({ error: "Username già esistente" });
-  const hp = await bcrypt.hash(password, 10);
+  
+  // Assicuriamo che la password sia trattata come stringa (importante se sono solo numeri)
+  const passStr = String(password);
+  const hp = await bcrypt.hash(passStr, 10);
+  
+  console.log(`Tentativo di registrazione per: ${username}`);
   const result = await sql`INSERT INTO users (username, password) VALUES (${username}, ${hp}) RETURNING id, username`;
-  const token = jwt.sign({ id: result[0].id, username: result[0].username }, JWT_SECRET, { expiresIn: "7d" });
+  
+  if (!result || result.length === 0) {
+    throw new Error("Il database non ha restituito l'utente creato");
+  }
+
+  const user = result[0];
+  const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: "7d" });
   res.cookie("token", token, { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 });
-  res.json(result[0]);
+  res.json(user);
 }));
 
 app.post("/api/auth/logout", (req, res) => {
@@ -265,6 +278,13 @@ app.post("/api/archive", authMiddleware, wrap(async (req, res) => {
 app.delete("/api/archive/:id", authMiddleware, wrap(async (req, res) => {
   const sql = getSql();
   await sql`DELETE FROM material_archive WHERE id = ${parseInt(req.params.id)}`;
+  res.json({ success: true });
+}));
+
+app.put("/api/archive/:id", authMiddleware, wrap(async (req, res) => {
+  const sql = getSql();
+  const { name, unit, quantity } = req.body;
+  await sql`UPDATE material_archive SET name = ${name}, unit = ${unit}, quantity = ${quantity} WHERE id = ${parseInt(req.params.id)}`;
   res.json({ success: true });
 }));
 

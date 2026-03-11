@@ -29,7 +29,9 @@ import {
   ChevronUp,
   ChevronDown,
   Lock,
-  User
+  User,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -64,6 +66,7 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [loginError, setLoginError] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Form states
   const [showLabForm, setShowLabForm] = useState(false);
@@ -71,10 +74,12 @@ export default function App() {
   const [showArchiveForm, setShowArchiveForm] = useState(false);
   const [showTransferForm, setShowTransferForm] = useState(false);
   const [selectedArchiveItem, setSelectedArchiveItem] = useState<ArchiveMaterial | null>(null);
+  const [editingArchiveItem, setEditingArchiveItem] = useState<ArchiveMaterial | null>(null);
   const [showIncomeForm, setShowIncomeForm] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
   const [archiveSearch, setArchiveSearch] = useState('');
+  const [archivePageSearch, setArchivePageSearch] = useState('');
   const [inventorySearch, setInventorySearch] = useState('');
   const [labToDelete, setLabToDelete] = useState<number | null>(null);
   const [archiveSort, setArchiveSort] = useState<{ key: keyof ArchiveMaterial; direction: 'asc' | 'desc' }>({
@@ -400,102 +405,150 @@ export default function App() {
     }
   };
 
+  const handleEditArchive = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingArchiveItem) return;
+    const formData = new FormData(e.currentTarget);
+    await fetch(`/api/archive/${editingArchiveItem.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: formData.get('name') as string,
+        unit: formData.get('unit') as string,
+        quantity: Number(formData.get('quantity')),
+      }),
+    });
+    setEditingArchiveItem(null);
+    fetchArchive();
+    if (selectedLab) fetchData(selectedLab.id);
+  };
+
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+      <div className="app-bg min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="brand-logo w-14 h-14 flex items-center justify-center">
+            <LayoutDashboard className="text-white w-7 h-7" />
+          </div>
+          <div className="flex gap-1.5">
+            {[0,1,2].map(i => (
+              <div key={i} className="w-2 h-2 rounded-full bg-sage-400 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <div className="app-bg min-h-screen flex items-center justify-center p-4">
+        {/* Decorative blobs */}
+        <div className="fixed top-0 left-0 w-96 h-96 bg-sage-200/30 rounded-full -translate-x-1/2 -translate-y-1/2 blur-3xl pointer-events-none" />
+        <div className="fixed bottom-0 right-0 w-80 h-80 bg-blush-200/20 rounded-full translate-x-1/2 translate-y-1/2 blur-3xl pointer-events-none" />
+
         <motion.div 
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-md"
+          transition={{ duration: 0.4, ease: 'easeOut' }}
+          className="w-full max-w-md relative z-10"
         >
           <div className="text-center mb-8">
-            <div className="bg-emerald-600 w-16 h-16 rounded-2xl shadow-xl shadow-emerald-200 flex items-center justify-center mx-auto mb-4">
-              <LayoutDashboard className="text-white w-8 h-8" />
-            </div>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight">LabManager</h1>
-            <p className="text-slate-500 font-medium">{isRegistering ? 'Crea un nuovo account' : 'Accedi per gestire la tua attività'}</p>
+            <motion.div
+              initial={{ scale: 0.7, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.1, type: 'spring', damping: 14 }}
+              className="brand-logo w-20 h-20 flex items-center justify-center mx-auto mb-5"
+            >
+              <LayoutDashboard className="text-white w-10 h-10" />
+            </motion.div>
+            <h1 style={{ fontFamily: 'Nunito, sans-serif' }} className="text-4xl font-black text-warm-900 tracking-tight">LabManager</h1>
+            <p className="text-warm-500 mt-1 font-medium">
+              {isRegistering ? 'Crea il tuo account ✨' : 'Bentornata, accedi per continuare 🌿'}
+            </p>
           </div>
 
-          <div className="glass-card p-8 space-y-6">
-            <form onSubmit={handleAuth} className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Username</label>
-                <div className="relative">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input 
-                    name="username"
-                    type="text"
-                    required
-                    placeholder="Il tuo username"
-                    className="w-full pl-12 pr-4 py-3 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all bg-slate-50/50"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Password</label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input 
-                    name="password"
-                    type="password"
-                    required
-                    placeholder="••••••••"
-                    className="w-full pl-12 pr-4 py-3 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all bg-slate-50/50"
-                  />
-                </div>
-              </div>
-
-              {loginError && (
-                <div className="text-rose-600 text-xs font-bold bg-rose-50 p-4 rounded-xl border border-rose-100 flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <AlertCircle size={14} />
-                    <span>Errore:</span>
+          <div className="modal-panel p-8 space-y-6">
+            <form onSubmit={handleAuth} className="space-y-5">
+              <div>
+                <label className="form-label">Username</label>
+                <div className="relative group">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none transition-colors group-focus-within:text-sage-600">
+                    <User size={18} className="text-sage-400 group-focus-within:text-sage-600 transition-colors" />
                   </div>
-                  <p className="opacity-80 break-words leading-relaxed">{loginError}</p>
-                  
-                  {technicalError && (
-                    <details className="mt-2 bg-white/50 p-2 rounded-lg border border-rose-200">
-                      <summary className="cursor-pointer text-[10px] text-rose-400 uppercase tracking-widest hover:text-rose-600">Dettagli tecnici</summary>
-                      <pre className="mt-2 text-[10px] font-mono overflow-auto max-h-32 text-slate-600 whitespace-pre-wrap">
-                        {technicalError}
-                      </pre>
-                    </details>
-                  )}
+                  <input 
+                    name="username" type="text" required autoFocus
+                    placeholder="Inserisci username"
+                    className="form-input h-12"
+                    style={{ paddingLeft: '50px' }}
+                  />
                 </div>
-              )}
+              </div>
 
-              <button 
-                type="submit"
-                className="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-lg active:scale-[0.98] mt-2"
-              >
-                {isRegistering ? 'Registrati' : 'Accedi'}
+              <div>
+                <label className="form-label">Password</label>
+                <div className="relative group">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none transition-colors group-focus-within:text-sage-600">
+                    <Lock size={18} className="text-sage-400 group-focus-within:text-sage-600 transition-colors" />
+                  </div>
+                  <input 
+                    name="password" type={showPassword ? "text" : "password"} required
+                    placeholder="••••••••"
+                    className="form-input pr-12 h-12"
+                    style={{ paddingLeft: '50px' }}
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-sage-400 hover:text-sage-600 p-1 rounded-lg transition-all active:scale-90"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+
+              <AnimatePresence>
+                {loginError && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="badge badge-rose p-3 rounded-xl flex flex-col gap-1.5 w-full text-left">
+                      <div className="flex items-center gap-2 font-bold">
+                        <AlertCircle size={13} />
+                        <span>{loginError}</span>
+                      </div>
+                      {technicalError && (
+                        <details className="text-[10px] opacity-70">
+                          <summary className="cursor-pointer">Dettagli tecnici</summary>
+                          <pre className="mt-1 whitespace-pre-wrap break-all">{technicalError}</pre>
+                        </details>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <button type="submit" className="btn-primary w-full mt-1 text-center flex items-center justify-center gap-2">
+                {isRegistering ? '✨ Crea account' : '🌿 Accedi'}
               </button>
             </form>
 
-            <div className="pt-4 border-t border-slate-100 text-center">
+            <div className="pt-4 border-t border-warm-100 text-center">
               <button 
-                onClick={() => {
-                  setIsRegistering(!isRegistering);
-                  setLoginError('');
-                }}
-                className="text-emerald-600 font-bold text-sm hover:underline"
+                onClick={() => { setIsRegistering(!isRegistering); setLoginError(''); }}
+                className="text-sage-600 font-bold text-sm hover:text-sage-800 transition-colors"
               >
-                {isRegistering ? 'Hai già un account? Accedi' : 'Non hai un account? Registrati'}
+                {isRegistering ? '← Hai già un account? Accedi' : 'Prima volta? Registrati →'}
               </button>
             </div>
           </div>
+
           {!isRegistering && (
-            <p className="text-center text-slate-400 text-sm mt-8">
-              Credenziali predefinite: <span className="font-bold text-slate-600">admin / admin</span>
+            <p className="text-center text-warm-400 text-sm mt-6">
+              Default: <span className="font-bold text-warm-600">admin / admin</span>
             </p>
           )}
         </motion.div>
@@ -505,151 +558,23 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
-      </div>
-    );
-  }
-
-  if (!selectedLab && !viewingArchive) {
-    return (
-      <div className="min-h-screen bg-slate-50 p-4 md:p-8 flex flex-col items-center">
-        <header className="w-full max-w-4xl flex flex-col sm:flex-row justify-between items-center gap-6 mb-8 md:mb-12">
-          <div className="flex items-center gap-3">
-            <div className="bg-emerald-600 p-3 rounded-2xl shadow-lg shadow-emerald-200">
-              <LayoutDashboard className="text-white w-8 h-8" />
-            </div>
-            <div>
-              <h1 className="font-black text-2xl md:text-3xl tracking-tight text-slate-900">LabManager</h1>
-              <p className="text-slate-500 text-xs md:text-sm font-medium">Gestione Laboratori & Inventario</p>
-            </div>
+      <div className="app-bg min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center gap-5">
+          <div className="brand-logo w-14 h-14 flex items-center justify-center">
+            <LayoutDashboard className="text-white w-7 h-7" />
           </div>
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <button 
-              onClick={() => {
-                setViewingArchive(true);
-                setActiveTab('archive');
-              }}
-              className="w-full sm:w-auto bg-white text-slate-700 border border-slate-200 px-6 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-slate-50 transition-all shadow-sm active:scale-95"
-            >
-              <Archive size={20} className="text-emerald-600" />
-              Archivio Materiali
-            </button>
-            <button 
-              onClick={() => setShowLabForm(true)}
-              className="w-full sm:w-auto bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 active:scale-95"
-            >
-              <Plus size={20} />
-              Nuovo Laboratorio
-            </button>
+          <div className="flex gap-1.5">
+            {[0,1,2].map(i => (
+              <div key={i} className="w-2 h-2 rounded-full bg-sage-400 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+            ))}
           </div>
-        </header>
-
-        <div className="w-full max-w-4xl grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
-          {laboratories.map(lab => (
-            <motion.div
-              key={lab.id}
-              whileHover={{ y: -4 }}
-              className="glass-card p-8 cursor-pointer group relative overflow-hidden"
-              onClick={() => setSelectedLab(lab)}
-            >
-              <AnimatePresence>
-                {labToDelete === lab.id && (
-                  <motion.div 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="absolute inset-0 z-20 bg-rose-600/95 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <AlertCircle className="text-white mb-2" size={32} />
-                    <p className="text-white font-bold mb-4">Eliminare definitivamente questo laboratorio?</p>
-                    <div className="flex gap-3 w-full">
-                      <button 
-                        onClick={() => setLabToDelete(null)}
-                        className="flex-1 bg-white/20 hover:bg-white/30 text-white py-2.5 rounded-xl font-bold transition-colors"
-                      >
-                        Annulla
-                      </button>
-                      <button 
-                        onClick={() => {
-                          handleDelete('laboratories', lab.id);
-                          setLabToDelete(null);
-                        }}
-                        className="flex-1 bg-white text-rose-600 py-2.5 rounded-xl font-bold transition-colors shadow-lg"
-                      >
-                        Elimina
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setLabToDelete(lab.id);
-                  }}
-                  className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
-                >
-                  <Trash2 size={20} />
-                </button>
-              </div>
-              <div className="flex items-center gap-4 mb-4">
-                <div className="bg-slate-100 p-4 rounded-2xl group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-colors">
-                  <Box size={32} />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-bold text-slate-800">{lab.name}</h3>
-                  <p className="text-slate-500">{lab.description || "Nessuna descrizione"}</p>
-                </div>
-              </div>
-              
-              <div className="flex justify-between items-end">
-                <div className="flex items-center gap-2 text-emerald-600 font-bold text-sm">
-                  Gestisci Laboratorio
-                  <ArrowUpRight size={16} />
-                </div>
-                <div className="text-right">
-                  <div className="text-[10px] uppercase font-black text-slate-400 tracking-widest flex items-center justify-end gap-1">
-                    Totale Utile Netto
-                  </div>
-                  <div className={cn(
-                    "font-bold text-lg",
-                    (lab.netProfit || 0) >= 0 ? "text-emerald-600" : "text-rose-600"
-                  )}>
-                    {formatCurrency(lab.netProfit || 0)}
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-          {laboratories.length === 0 && (
-            <div className="col-span-full py-20 text-center space-y-4">
-              <div className="bg-slate-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto text-slate-400">
-                <Box size={40} />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-slate-800">Nessun laboratorio</h3>
-                <p className="text-slate-500">Inizia creando il tuo primo laboratorio</p>
-              </div>
-            </div>
-          )}
+          <p className="text-warm-500 text-sm font-semibold">Caricamento dati...</p>
         </div>
-
-        <Modal show={showLabForm} onClose={() => setShowLabForm(false)} title="Nuovo Laboratorio">
-          <form onSubmit={handleAddLab} className="space-y-4">
-            <Input label="Nome Laboratorio" name="name" required placeholder="es. Laboratorio Ceramica" />
-            <Input label="Descrizione" name="description" placeholder="es. Sede centrale, piano terra..." />
-            <button type="submit" className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 active:scale-95">
-              Crea Laboratorio
-            </button>
-          </form>
-        </Modal>
       </div>
     );
   }
+
+  // Removed early return for !selectedLab to ensure sidebar visibility
 
   const pieData = (summary && summary.breakdown) ? [
     { name: 'Materiali', value: summary.breakdown.materials || 0, color: '#10b981' },
@@ -681,114 +606,67 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row pb-20 md:pb-0">
+    <div className="app-bg min-h-screen flex flex-col md:flex-row pb-20 md:pb-0">
       {/* Mobile Top Bar */}
-      <div className="md:hidden bg-white border-b border-slate-200 p-4 flex justify-between items-center sticky top-0 z-40">
-        <div className="flex items-center gap-2">
-          <div className="bg-emerald-600 p-1.5 rounded-lg">
+      <div className="md:hidden top-bar p-4 flex justify-between items-center sticky top-0 z-40">
+        <div className="flex items-center gap-2.5">
+          <div className="brand-logo p-1.5">
             <LayoutDashboard className="text-white w-5 h-5" />
           </div>
-          <h1 className="font-bold text-lg tracking-tight text-slate-800">LabManager</h1>
+          <span style={{ fontFamily: 'Nunito, sans-serif' }} className="font-black text-lg text-warm-900">LabManager</span>
         </div>
-        <button 
-          onClick={handleLogout}
-          className="text-slate-400 hover:text-rose-500 p-2 rounded-lg transition-colors border border-transparent hover:border-rose-100 hover:bg-rose-50"
-          title="Esci"
-        >
-          <LogOut size={24} />
+        <button onClick={handleLogout} className="logout-btn" title="Esci">
+          <LogOut size={20} />
         </button>
       </div>
 
       {/* Sidebar / Bottom Nav */}
-      <nav className="fixed bottom-0 left-0 right-0 md:sticky md:top-0 md:w-64 md:h-screen bg-white border-t md:border-t-0 md:border-r border-slate-200 p-2 md:p-4 flex md:flex-col gap-1 md:gap-2 z-50">
-        <div className="hidden md:flex items-center gap-2 px-2 mb-8">
-          <div className="bg-emerald-600 p-2 rounded-lg">
-            <LayoutDashboard className="text-white w-6 h-6" />
+      <nav className="sidebar fixed bottom-0 left-0 right-0 md:sticky md:top-0 md:w-64 md:h-screen p-2 md:p-5 flex md:flex-col gap-1 md:gap-1.5 z-50 border-t md:border-t-0">
+        {/* Brand */}
+        <div className="hidden md:flex items-center gap-3 px-3 mb-8 mt-2">
+          <div className="brand-logo p-2.5 rounded-xl">
+            <LayoutDashboard className="text-white w-5 h-5" />
           </div>
-          <h1 className="font-bold text-xl tracking-tight text-slate-800">LabManager</h1>
+          <div>
+            <div style={{ fontFamily: 'Nunito, sans-serif' }} className="font-black text-lg text-warm-900 leading-none">LabManager</div>
+            <div className="text-[10px] text-warm-400 font-medium">Gestione Laboratori</div>
+          </div>
         </div>
 
-        <div className="hidden md:block mb-6 px-2">
-          <div className="text-[10px] uppercase font-black text-slate-400 tracking-widest mb-2">
-            {viewingArchive ? "Sola Lettura" : "Laboratorio Attivo"}
-          </div>
-          <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-            <div className="font-bold text-slate-800 truncate">
-              {viewingArchive ? "Archivio Globale" : selectedLab?.name}
+        {/* Active context pill */}
+        <div className="hidden md:block mb-5 px-1">
+          <div className="bg-sage-50 border border-sage-100 rounded-2xl p-3">
+            <div className="text-[9px] uppercase font-black text-sage-500 tracking-widest mb-1">
+              {viewingArchive ? "Magazzino" : selectedLab ? "Lab attivo" : "Panoramica"}
             </div>
-            <button 
-              onClick={handleLogout}
-              className="text-slate-400 hover:text-rose-600 transition-all mt-2 p-1 hover:bg-rose-50 rounded-lg inline-flex items-center justify-center font-bold text-xs gap-1"
-              title="Esci"
-            >
-              <LogOut size={16} /> Logout
+            <div className="font-bold text-warm-800 text-sm truncate">
+              {viewingArchive ? "Archivio Globale" : selectedLab?.name ?? "Seleziona laboratorio"}
+            </div>
+            <button onClick={handleLogout} className="logout-btn mt-2 px-0 text-[11px]">
+              <LogOut size={13} /> Esci dall'account
             </button>
           </div>
         </div>
 
-        {/* Home Button (List of Labs) */}
-        <NavItem 
-          active={!selectedLab && !viewingArchive} 
-          onClick={() => {
-            setSelectedLab(null);
-            setViewingArchive(false);
-          }}
-          icon={<Home size={20} />}
-          label="Home"
-        />
+        {/* Nav items */}
+        <NavItem active={!selectedLab && !viewingArchive} onClick={() => { setSelectedLab(null); setViewingArchive(false); }} icon={<Home size={18} />} label="Home" />
 
         {!viewingArchive ? (
           <>
             {selectedLab && (
               <>
-                <NavItem 
-                  active={activeTab === 'dashboard'} 
-                  onClick={() => setActiveTab('dashboard')}
-                  icon={<LayoutDashboard size={20} />}
-                  label="Laboratorio"
-                />
-                <NavItem 
-                  active={activeTab === 'finances'} 
-                  onClick={() => setActiveTab('finances')}
-                  icon={<TrendingUp size={20} />}
-                  label="Cassa"
-                />
-                <NavItem 
-                  active={activeTab === 'inventory'} 
-                  onClick={() => setActiveTab('inventory')}
-                  icon={<Package size={20} />}
-                  label="Materiale Lab"
-                />
+                <NavItem active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<LayoutDashboard size={18} />} label="Panoramica" />
+                <NavItem active={activeTab === 'finances'} onClick={() => setActiveTab('finances')} icon={<TrendingUp size={18} />} label="Cassa" />
+                <NavItem active={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} icon={<Package size={18} />} label="Materiali Lab" />
               </>
             )}
-            <NavItem 
-              active={false} 
-              onClick={() => {
-                setViewingArchive(true);
-                setActiveTab('archive');
-              }}
-              icon={<Archive size={20} />}
-              label="Magazzino"
-            />
+            <NavItem active={false} onClick={() => { setViewingArchive(true); setActiveTab('archive'); }} icon={<Archive size={18} />} label="Magazzino" />
           </>
         ) : (
           <>
-            <NavItem 
-              active={activeTab === 'archive'} 
-              onClick={() => setActiveTab('archive')}
-              icon={<Archive size={20} />}
-              label="Magazzino"
-            />
+            <NavItem active={activeTab === 'archive'} onClick={() => setActiveTab('archive')} icon={<Archive size={18} />} label="Magazzino" />
             {selectedLab && (
-              <NavItem 
-                active={false} 
-                onClick={() => {
-                  setViewingArchive(false);
-                  setActiveTab('dashboard');
-                }}
-                icon={<LayoutDashboard size={20} />}
-                label="Torna al Lab"
-              />
+              <NavItem active={false} onClick={() => { setViewingArchive(false); setActiveTab('dashboard'); }} icon={<LayoutDashboard size={18} />} label="Torna al Lab" />
             )}
           </>
         )}
@@ -797,46 +675,105 @@ export default function App() {
       {/* Main Content */}
       <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
         <AnimatePresence mode="wait">
-          {activeTab === 'dashboard' && (
-            <motion.div
-              key="dashboard"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="space-y-8"
-            >
+          {!selectedLab && !viewingArchive && (
+            <motion.div key="home" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }} className="space-y-10">
+              <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-5">
+                <div>
+                  <h2 className="section-title">I Tuoi Laboratori 🌿</h2>
+                  <p className="section-subtitle">Seleziona un laboratorio per gestire materiali e finanze</p>
+                </div>
+                <button onClick={() => setShowLabForm(true)} className="btn-primary flex items-center gap-2 whitespace-nowrap">
+                  <Plus size={18} /> Nuovo Lab
+                </button>
+              </header>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {laboratories.map((lab, i) => (
+                  <motion.div
+                    key={lab.id}
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.06 }}
+                    whileHover={{ y: -4 }}
+                    className="glass-card p-7 cursor-pointer group relative overflow-hidden"
+                    onClick={() => { setSelectedLab(lab); setActiveTab('dashboard'); }}
+                  >
+                    <AnimatePresence>
+                      {labToDelete === lab.id && (
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                          className="absolute inset-0 z-20 bg-blush-600/95 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center rounded-2xl"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <AlertCircle className="text-white mb-2" size={28} />
+                          <p className="text-white font-bold mb-4 text-sm">Eliminare questo laboratorio?</p>
+                          <div className="flex gap-2 w-full">
+                            <button onClick={() => setLabToDelete(null)} className="flex-1 bg-white/20 hover:bg-white/30 text-white py-2 rounded-xl font-bold text-sm">Annulla</button>
+                            <button onClick={() => { handleDelete('laboratories', lab.id); setLabToDelete(null); }} className="flex-1 bg-white text-blush-600 py-2 rounded-xl font-bold text-sm">Elimina</button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={(e) => { e.stopPropagation(); setLabToDelete(lab.id); }} className="p-2 text-warm-300 hover:text-blush-500 hover:bg-blush-50 rounded-xl transition-all">
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-4 mb-5">
+                      <div className="bg-sage-50 border border-sage-100 p-4 rounded-2xl group-hover:bg-sage-500 group-hover:border-sage-500 transition-all">
+                        <Box size={28} className="text-sage-500 group-hover:text-white transition-colors" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 style={{ fontFamily: 'Nunito, sans-serif' }} className="font-black text-xl text-warm-900 truncate">{lab.name}</h3>
+                        <p className="text-warm-400 text-sm line-clamp-1">{lab.description || 'Nessuna descrizione'}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-end pt-4 border-t border-sage-50">
+                      <span className="text-[10px] font-black text-sage-500 uppercase tracking-widest flex items-center gap-1">Entra <ArrowUpRight size={12} /></span>
+                      <div className="text-right">
+                        <div className="text-[9px] uppercase font-black text-warm-300 tracking-widest mb-0.5">Utile Netto</div>
+                        <div className={cn("font-black text-base", (lab.netProfit || 0) >= 0 ? "text-sage-600" : "text-blush-600")}>
+                          {formatCurrency(lab.netProfit || 0)}
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+                {laboratories.length === 0 && (
+                  <div className="col-span-full py-24 text-center space-y-4">
+                    <div className="bg-sage-50 border border-sage-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto">
+                      <Box size={36} className="text-sage-400" />
+                    </div>
+                    <div>
+                      <h3 style={{ fontFamily: 'Nunito, sans-serif' }} className="text-xl font-black text-warm-800">Nessun laboratorio</h3>
+                      <p className="text-warm-400">Inizia creando il tuo primo laboratorio</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'dashboard' && selectedLab && (
+            <motion.div key="dashboard" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }} className="space-y-8">
               <header className="flex flex-col sm:flex-row justify-between items-end gap-4">
                 <div>
-                  <h2 className="text-3xl font-bold text-slate-900">Panoramica</h2>
-                  <p className="text-slate-500">Stato attuale della tua attività</p>
+                  <h2 className="section-title">Panoramica</h2>
+                  <p className="section-subtitle italic">Laboratorio: {selectedLab?.name}</p>
                 </div>
                 <div className="text-right">
-                  <div className="text-[10px] uppercase font-black text-slate-400 tracking-widest mb-1">
-                    Totale Utile Netto
-                  </div>
-                  <div className={cn(
-                    "text-3xl font-black",
-                    (summary?.netProfit || 0) >= 0 ? "text-emerald-600" : "text-rose-600"
-                  )}>
+                  <div className="text-[10px] uppercase font-black text-warm-400 tracking-widest mb-1">Totale Utile Netto</div>
+                  <div className={cn("text-3xl font-black", { fontFamily: 'Nunito, sans-serif' }, (summary?.netProfit || 0) >= 0 ? "text-sage-600" : "text-blush-600")}>
                     {formatCurrency(summary?.netProfit || 0)}
                   </div>
                 </div>
               </header>
 
-              {/* Summary Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <StatCard 
-                  title="Entrate Totali" 
-                  value={formatCurrency(summary?.totalIncome || 0)} 
-                  icon={<ArrowUpRight className="text-emerald-600" />}
-                  trend="positive"
-                />
-                <StatCard 
-                  title="Uscite Totali" 
-                  value={formatCurrency(summary?.totalExpenses || 0)} 
-                  icon={<ArrowDownRight className="text-rose-600" />}
-                  trend="negative"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <StatCard title="Entrate Totali" value={formatCurrency(summary?.totalIncome || 0)} icon={<ArrowUpRight className="text-sage-600" />} trend="positive" />
+                <StatCard title="Uscite Totali" value={formatCurrency(summary?.totalExpenses || 0)} icon={<ArrowDownRight className="text-blush-500" />} trend="negative" />
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -925,26 +862,21 @@ export default function App() {
             >
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <header>
-                  <h2 className="text-3xl font-bold text-slate-900">Inventario</h2>
-                  <p className="text-slate-500">Gestisci i materiali e il loro utilizzo</p>
+                  <h2 className="section-title flex items-center gap-2"><Package size={26} className="text-sage-500" />Materiali Lab</h2>
+                  <p className="section-subtitle">Gestisci i materiali e il loro utilizzo</p>
                 </header>
-                <button 
-                  onClick={() => setShowMaterialForm(true)}
-                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm"
-                >
-                  <Plus size={20} />
-                  Nuovo Materiale
+                <button onClick={() => setShowMaterialForm(true)} className="btn-primary flex items-center gap-2 whitespace-nowrap">
+                  <Plus size={18} /> Nuovo Materiale
                 </button>
               </div>
 
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                <input 
+              <div className="search-box">
+                <Search size={17} className="icon" />
+                <input
                   type="text"
                   placeholder="Cerca materiale per nome o posizione..."
                   value={inventorySearch}
                   onChange={(e) => setInventorySearch(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all shadow-sm bg-white"
                 />
               </div>
 
@@ -980,23 +912,15 @@ export default function App() {
             >
               <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                  <h2 className="text-3xl font-bold text-slate-900">Economia</h2>
-                  <p className="text-slate-500">Entrate dalle quote e uscite varie</p>
+                  <h2 className="section-title flex items-center gap-2"><Wallet size={26} className="text-sage-500" />Cassa</h2>
+                  <p className="section-subtitle">Entrate dalle quote e uscite varie</p>
                 </div>
                 <div className="flex gap-2 w-full sm:w-auto">
-                  <button 
-                    onClick={() => setShowIncomeForm(true)}
-                    className="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm"
-                  >
-                    <ArrowUpRight size={20} />
-                    Entrata
+                  <button onClick={() => setShowIncomeForm(true)} className="btn-primary flex-1 sm:flex-none flex items-center justify-center gap-2">
+                    <ArrowUpRight size={18} /> + Entrata
                   </button>
-                  <button 
-                    onClick={() => setShowExpenseForm(true)}
-                    className="flex-1 sm:flex-none bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm"
-                  >
-                    <ArrowDownRight size={20} />
-                    Uscita
+                  <button onClick={() => setShowExpenseForm(true)} className="btn-danger flex-1 sm:flex-none flex items-center justify-center gap-2">
+                    <ArrowDownRight size={18} /> - Uscita
                   </button>
                 </div>
               </header>
@@ -1078,182 +1002,112 @@ export default function App() {
             </motion.div>
           )}
           {activeTab === 'archive' && viewingArchive && (
-            <motion.div
-              key="archive"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="space-y-8"
-            >
+            <motion.div key="archive" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }} className="space-y-6">
               <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                  <h2 className="text-3xl font-bold text-slate-900">Archivio Materiali</h2>
-                  <p className="text-slate-500">Database centrale dei materiali condiviso</p>
+                  <h2 className="section-title">Magazzino 📦</h2>
+                  <p className="section-subtitle">Database centrale dei materiali</p>
                 </div>
-                <button 
-                  onClick={() => setShowArchiveForm(true)}
-                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-100 active:scale-95"
-                >
-                  <Plus size={20} />
-                  Nuovo Materiale Archivio
+                <button onClick={() => setShowArchiveForm(true)} className="btn-primary flex items-center gap-2 whitespace-nowrap">
+                  <Plus size={18} /> Nuovo Materiale
                 </button>
               </header>
+
+              {/* Search */}
+              <div className="search-box">
+                <Search size={17} className="icon" />
+                <input
+                  type="text"
+                  placeholder="Cerca per nome o unità..."
+                  value={archivePageSearch}
+                  onChange={(e) => setArchivePageSearch(e.target.value)}
+                />
+              </div>
 
               <div className="glass-card overflow-hidden">
                 {/* Desktop Table */}
                 <div className="hidden md:block overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
+                  <table className="w-full text-left border-collapse tbl">
                     <thead>
-                      <tr className="bg-slate-50 border-b border-slate-100">
-                        <th 
-                          className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:text-emerald-600 transition-colors"
-                          onClick={() => toggleArchiveSort('name')}
-                        >
-                          <div className="flex items-center gap-1">
-                            Nome
-                            {archiveSort.key === 'name' && (
-                              archiveSort.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
-                            )}
-                          </div>
+                      <tr>
+                        <th onClick={() => toggleArchiveSort('name')} className="cursor-pointer hover:text-sage-600 transition-colors">
+                          <div className="flex items-center gap-1">Nome {archiveSort.key === 'name' && (archiveSort.direction === 'asc' ? <ChevronUp size={13} /> : <ChevronDown size={13} />)}</div>
                         </th>
-                        <th 
-                          className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:text-emerald-600 transition-colors"
-                          onClick={() => toggleArchiveSort('unit')}
-                        >
-                          <div className="flex items-center gap-1">
-                            Unità
-                            {archiveSort.key === 'unit' && (
-                              archiveSort.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
-                            )}
-                          </div>
+                        <th onClick={() => toggleArchiveSort('unit')} className="cursor-pointer hover:text-sage-600 transition-colors">
+                          <div className="flex items-center gap-1">Unità {archiveSort.key === 'unit' && (archiveSort.direction === 'asc' ? <ChevronUp size={13} /> : <ChevronDown size={13} />)}</div>
                         </th>
-                        <th 
-                          className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:text-emerald-600 transition-colors"
-                          onClick={() => toggleArchiveSort('quantity')}
-                        >
-                          <div className="flex items-center gap-1">
-                            Giacenza Archivio
-                            {archiveSort.key === 'quantity' && (
-                              archiveSort.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
-                            )}
-                          </div>
+                        <th onClick={() => toggleArchiveSort('quantity')} className="cursor-pointer hover:text-sage-600 transition-colors">
+                          <div className="flex items-center gap-1">Giacenza {archiveSort.key === 'quantity' && (archiveSort.direction === 'asc' ? <ChevronUp size={13} /> : <ChevronDown size={13} />)}</div>
                         </th>
-                        <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Azioni</th>
+                        <th className="text-right">Azioni</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {sortedArchiveMaterials.map(m => (
-                        <tr key={m.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                          <td className="p-4 font-bold text-slate-800">{m.name}</td>
-                          <td className="p-4 text-slate-600">{m.unit}</td>
-                          <td className="p-4">
-                            <span className={cn(
-                              "px-3 py-1 rounded-full text-xs font-bold",
-                              m.quantity > 0 ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
-                            )}>
+                      {sortedArchiveMaterials
+                        .filter(m => m.name.toLowerCase().includes(archivePageSearch.toLowerCase()) || m.unit.toLowerCase().includes(archivePageSearch.toLowerCase()))
+                        .map((m, i) => (
+                        <motion.tr key={m.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.04 }} className="border-b border-sage-50 hover:bg-sage-50/40 transition-colors">
+                          <td className="font-bold text-warm-900">{m.name}</td>
+                          <td className="text-warm-500">{m.unit}</td>
+                          <td>
+                            <span className={cn("badge", m.quantity > 0 ? "badge-green" : "badge-rose")}>
                               {m.quantity} {m.unit}
                             </span>
                           </td>
-                          <td className="p-4 text-right flex justify-end gap-2">
-                            <button 
-                              onClick={() => {
-                                setSelectedArchiveItem(m);
-                                setShowTransferForm(true);
-                              }}
-                              className="text-emerald-600 hover:bg-emerald-50 p-2 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold"
-                            >
-                              <ArrowUpRight size={16} />
-                              Invia a Laboratorio
-                            </button>
-                            <button 
-                              onClick={() => handleDelete('archive', m.id)}
-                              className="text-slate-300 hover:text-rose-500 p-2 rounded-lg transition-colors"
-                            >
-                              <Trash2 size={18} />
-                            </button>
+                          <td>
+                            <div className="flex justify-end items-center gap-2">
+                              <button
+                                onClick={() => { setSelectedArchiveItem(m); setShowTransferForm(true); }}
+                                className="btn-primary flex items-center gap-1.5 text-xs px-3 py-2"
+                                style={{ padding: '7px 14px', fontSize: '0.78rem' }}
+                              >
+                                <ArrowUpRight size={14} /> Invia → Lab
+                              </button>
+                              <button onClick={() => setEditingArchiveItem(m)} className="btn-secondary flex items-center gap-1 text-xs px-3 py-2" style={{ padding: '7px 12px', fontSize: '0.78rem' }}>
+                                <Pencil size={13} />
+                              </button>
+                              <button onClick={() => handleDelete('archive', m.id)} className="btn-ghost text-blush-400 hover:text-blush-600 p-2">
+                                <Trash2 size={15} />
+                              </button>
+                            </div>
                           </td>
-                        </tr>
+                        </motion.tr>
                       ))}
-                      {sortedArchiveMaterials.length === 0 && (
-                        <tr>
-                          <td colSpan={4} className="p-12 text-center text-slate-400 italic">
-                            L'archivio è vuoto. Aggiungi materiali per usarli nei laboratori.
-                          </td>
-                        </tr>
+                      {sortedArchiveMaterials.filter(m => m.name.toLowerCase().includes(archivePageSearch.toLowerCase())).length === 0 && (
+                        <tr><td colSpan={4} className="p-12 text-center text-warm-400 italic">Nessun materiale trovato</td></tr>
                       )}
                     </tbody>
                   </table>
                 </div>
 
                 {/* Mobile Cards */}
-                <div className="md:hidden divide-y divide-slate-100">
-                  <div className="p-4 bg-slate-50 flex gap-2 overflow-x-auto no-scrollbar">
-                    <button 
-                      onClick={() => toggleArchiveSort('name')}
-                      className={cn(
-                        "px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all",
-                        archiveSort.key === 'name' ? "bg-emerald-600 text-white" : "bg-white text-slate-600 border border-slate-200"
-                      )}
-                    >
-                      Nome {archiveSort.key === 'name' && (archiveSort.direction === 'asc' ? '↑' : '↓')}
-                    </button>
-                    <button 
-                      onClick={() => toggleArchiveSort('unit')}
-                      className={cn(
-                        "px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all",
-                        archiveSort.key === 'unit' ? "bg-emerald-600 text-white" : "bg-white text-slate-600 border border-slate-200"
-                      )}
-                    >
-                      Unità {archiveSort.key === 'unit' && (archiveSort.direction === 'asc' ? '↑' : '↓')}
-                    </button>
-                    <button 
-                      onClick={() => toggleArchiveSort('quantity')}
-                      className={cn(
-                        "px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all",
-                        archiveSort.key === 'quantity' ? "bg-emerald-600 text-white" : "bg-white text-slate-600 border border-slate-200"
-                      )}
-                    >
-                      Quantità {archiveSort.key === 'quantity' && (archiveSort.direction === 'asc' ? '↑' : '↓')}
-                    </button>
-                  </div>
-                  {sortedArchiveMaterials.map(m => (
+                <div className="md:hidden divide-y divide-sage-50">
+                  {sortedArchiveMaterials
+                    .filter(m => m.name.toLowerCase().includes(archivePageSearch.toLowerCase()))
+                    .map(m => (
                     <div key={m.id} className="p-4 space-y-3">
                       <div className="flex justify-between items-start">
                         <div>
-                          <h4 className="font-bold text-slate-800">{m.name}</h4>
-                          <p className="text-xs text-slate-500">Unità: {m.unit}</p>
+                          <h4 className="font-bold text-warm-900">{m.name}</h4>
+                          <p className="text-xs text-warm-400">Unità: {m.unit}</p>
                         </div>
-                        <span className={cn(
-                          "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
-                          m.quantity > 0 ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
-                        )}>
-                          {m.quantity} {m.unit}
-                        </span>
+                        <span className={cn("badge", m.quantity > 0 ? "badge-green" : "badge-rose")}>{m.quantity} {m.unit}</span>
                       </div>
                       <div className="flex gap-2">
-                        <button 
-                          onClick={() => {
-                            setSelectedArchiveItem(m);
-                            setShowTransferForm(true);
-                          }}
-                          className="flex-1 bg-emerald-50 text-emerald-700 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1"
-                        >
-                          <ArrowUpRight size={14} />
-                          Invia a Laboratorio
+                        <button onClick={() => { setSelectedArchiveItem(m); setShowTransferForm(true); }} className="btn-primary flex-1 text-xs flex items-center justify-center gap-1.5" style={{ padding: '9px 12px', fontSize: '0.78rem' }}>
+                          <ArrowUpRight size={14} /> Invia → Lab
                         </button>
-                        <button 
-                          onClick={() => handleDelete('archive', m.id)}
-                          className="px-3 bg-slate-50 text-slate-400 py-2 rounded-xl"
-                        >
+                        <button onClick={() => setEditingArchiveItem(m)} className="btn-secondary px-3 py-2 flex items-center gap-1 text-xs">
+                          <Pencil size={13} />
+                        </button>
+                        <button onClick={() => handleDelete('archive', m.id)} className="btn-ghost px-3 py-2 text-blush-400">
                           <Trash2 size={14} />
                         </button>
                       </div>
                     </div>
                   ))}
                   {sortedArchiveMaterials.length === 0 && (
-                    <div className="p-8 text-center text-slate-400 italic text-sm">
-                      L'archivio è vuoto.
-                    </div>
+                    <div className="p-8 text-center text-warm-400 italic text-sm">Il magazzino è vuoto.</div>
                   )}
                 </div>
               </div>
@@ -1367,73 +1221,58 @@ export default function App() {
             placeholder="es. Scaffale A, Armadio 2..." 
             defaultValue={editingMaterial?.location}
           />
-          <button type="submit" className="w-full bg-emerald-600 text-white py-3 rounded-xl font-semibold hover:bg-emerald-700 transition-colors">
+          <button type="submit" className="btn-primary w-full">
             {editingMaterial ? "Aggiorna Materiale" : "Salva Materiale"}
           </button>
         </form>
       </Modal>
 
-      <Modal show={showArchiveForm} onClose={() => setShowArchiveForm(false)} title="Nuovo Materiale Archivio">
+      <Modal show={showArchiveForm} onClose={() => setShowArchiveForm(false)} title="Nuovo Materiale Magazzino">
         <form onSubmit={handleAddArchive} className="space-y-4">
           <Input label="Nome Materiale" name="name" required placeholder="es. Argilla Rossa" />
-          <Input label="Unità di misura" name="unit" required placeholder="es. kg, litri, pz" />
-          <Input label="Quantità Iniziale" name="quantity" type="number" step="0.01" required />
-          <button type="submit" className="w-full bg-emerald-600 text-white py-3 rounded-xl font-semibold hover:bg-emerald-700 transition-colors">
-            Aggiungi all'Archivio
-          </button>
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="Unità" name="unit" required placeholder="es. kg, litri" />
+            <Input label="Quantità" name="quantity" type="number" step="0.01" required />
+          </div>
+          <button type="submit" className="btn-primary w-full">Aggiungi al Magazzino</button>
         </form>
       </Modal>
 
-      <Modal 
-        show={showTransferForm} 
-        onClose={() => {
-          setShowTransferForm(false);
-          setSelectedArchiveItem(null);
-        }} 
-        title={`Invia ${selectedArchiveItem?.name} a Laboratorio`}
-      >
+      <Modal show={showTransferForm} onClose={() => { setShowTransferForm(false); setSelectedArchiveItem(null); }} title={`Invia ${selectedArchiveItem?.name} → Lab`}>
+        <div className="mb-4 p-3 bg-sage-50 border border-sage-100 rounded-xl text-sm text-sage-700 font-medium">
+          Disponibile: <strong>{selectedArchiveItem?.quantity} {selectedArchiveItem?.unit}</strong>
+        </div>
         <form onSubmit={handleTransfer} className="space-y-4">
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-slate-700">Laboratorio Destinazione</label>
-            <select name="laboratory_id" required className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all">
+          <div>
+            <label className="form-label">Laboratorio Destinazione</label>
+            <select name="laboratory_id" required className="form-input">
               <option value="">Seleziona laboratorio...</option>
               {laboratories.map(lab => (
                 <option key={lab.id} value={lab.id}>{lab.name}</option>
               ))}
             </select>
           </div>
-          <div className="grid grid-cols-1 gap-4">
-            <Input 
-              label={`Quantità (${selectedArchiveItem?.unit})`} 
-              name="quantity" 
-              type="number" 
-              step="0.01" 
-              max={selectedArchiveItem?.quantity}
-              required 
-            />
-          </div>
-          <button type="submit" className="w-full bg-emerald-600 text-white py-3 rounded-xl font-semibold hover:bg-emerald-700 transition-colors">
-            Conferma Trasferimento
+          <Input label={`Quantità (${selectedArchiveItem?.unit})`} name="quantity" type="number" step="0.01" max={selectedArchiveItem?.quantity} required />
+          <button type="submit" className="btn-primary w-full flex items-center justify-center gap-2">
+            <ArrowUpRight size={18} /> Conferma Trasferimento
           </button>
         </form>
       </Modal>
 
-      <Modal show={showIncomeForm} onClose={() => setShowIncomeForm(false)} title="Registra Entrata">
+      <Modal show={showIncomeForm} onClose={() => setShowIncomeForm(false)} title="✨ Registra Entrata">
         <form onSubmit={handleAddIncome} className="space-y-4">
           <Input label="Descrizione" name="description" required placeholder="es. Quota Mario Rossi" />
           <Input label="Importo (€)" name="amount" type="number" step="0.01" required />
           <Input label="Data" name="date" type="date" defaultValue={new Date().toISOString().split('T')[0]} />
-          <button type="submit" className="w-full bg-emerald-600 text-white py-3 rounded-xl font-semibold hover:bg-emerald-700 transition-colors">
-            Salva Entrata
-          </button>
+          <button type="submit" className="btn-primary w-full">Salva Entrata</button>
         </form>
       </Modal>
 
-      <Modal show={showExpenseForm} onClose={() => setShowExpenseForm(false)} title="Registra Uscita">
+      <Modal show={showExpenseForm} onClose={() => setShowExpenseForm(false)} title="📤 Registra Uscita">
         <form onSubmit={handleAddExpense} className="space-y-4">
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-slate-700">Categoria</label>
-            <select name="category" className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all">
+          <div>
+            <label className="form-label">Categoria</label>
+            <select name="category" className="form-input">
               <option value="salary">Stipendio Dipendente</option>
               <option value="other">Altra Uscita</option>
             </select>
@@ -1441,9 +1280,7 @@ export default function App() {
           <Input label="Descrizione" name="description" required placeholder="es. Stipendio Febbraio" />
           <Input label="Importo (€)" name="amount" type="number" step="0.01" required />
           <Input label="Data" name="date" type="date" defaultValue={new Date().toISOString().split('T')[0]} />
-          <button type="submit" className="w-full bg-rose-600 text-white py-3 rounded-xl font-semibold hover:bg-rose-700 transition-colors">
-            Salva Uscita
-          </button>
+          <button type="submit" className="btn-danger w-full">Salva Uscita</button>
         </form>
       </Modal>
 
@@ -1486,6 +1323,18 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Edit Archive Modal */}
+      <Modal show={!!editingArchiveItem} onClose={() => setEditingArchiveItem(null)} title="Modifica Materiale Magazzino">
+        <form onSubmit={handleEditArchive} className="space-y-4">
+          <Input label="Nome" name="name" required defaultValue={editingArchiveItem?.name} />
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="Unità" name="unit" required defaultValue={editingArchiveItem?.unit} />
+            <Input label="Quantità" name="quantity" type="number" step="0.01" required defaultValue={editingArchiveItem?.quantity} />
+          </div>
+          <button type="submit" className="btn-primary w-full">Salva Modifiche</button>
+        </form>
+      </Modal>
     </div>
   );
 }
@@ -1494,37 +1343,30 @@ export default function App() {
 
 function NavItem({ active, onClick, icon, label }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string }) {
   return (
-    <button 
+    <button
       onClick={onClick}
       className={cn(
-        "flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 px-2 md:px-4 py-2 md:py-3 rounded-xl transition-all duration-200 group flex-1 md:flex-none",
-        active 
-          ? "bg-emerald-50 text-emerald-700 font-bold shadow-sm" 
-          : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+        "nav-item flex-1 md:flex-none flex-col md:flex-row justify-center md:justify-start text-[10px] md:text-sm",
+        active ? "active" : ""
       )}
     >
-      <span className={cn("transition-transform group-hover:scale-110", active ? "text-emerald-600" : "text-slate-400")}>
+      <span className={cn("transition-transform group-hover:scale-110", active ? "text-sage-600" : "text-warm-400")}>
         {icon}
       </span>
-      <span className="text-[10px] md:text-sm font-medium">{label}</span>
+      <span className="font-semibold">{label}</span>
     </button>
   );
 }
 
 function StatCard({ title, value, icon, trend, highlight }: { title: string, value: string, icon: React.ReactNode, trend?: 'positive' | 'negative', highlight?: boolean }) {
   return (
-    <div className={cn(
-      "glass-card p-6 flex flex-col justify-between h-32 transition-transform hover:scale-[1.02]",
-      highlight && "bg-slate-900 border-slate-800"
-    )}>
-      <div className="flex justify-between items-start">
-        <span className={cn("text-sm font-medium", highlight ? "text-slate-400" : "text-slate-500")}>{title}</span>
-        <div className={cn("p-2 rounded-lg", highlight ? "bg-slate-800" : "bg-slate-50")}>
-          {icon}
-        </div>
+    <div className={cn("stat-card", highlight && "highlight")}>
+      <div className="flex justify-between items-start mb-3">
+        <span className={cn("text-sm font-semibold", highlight ? "text-sage-200" : "text-warm-500")}>{title}</span>
+        <div className={cn("p-2 rounded-xl", highlight ? "bg-white/10" : "bg-sage-50 border border-sage-100")}>{icon}</div>
       </div>
-      <div className="flex items-baseline gap-2">
-        <span className={cn("text-2xl font-bold tracking-tight", highlight ? "text-white" : "text-slate-900")}>{value}</span>
+      <div className={cn("text-2xl font-black tracking-tight", highlight ? "text-white" : trend === 'positive' ? "text-sage-600" : trend === 'negative' ? "text-blush-600" : "text-warm-900")}>
+        {value}
       </div>
     </div>
   );
@@ -1544,99 +1386,78 @@ function MaterialCard({ material, onAddUsage, onDelete, onEdit }: MaterialCardPr
   const percentage = Math.max(0, Math.round((remaining / material.total_quantity) * 100));
 
   return (
-    <div className="glass-card p-6 space-y-4">
+    <motion.div whileHover={{ y: -2 }} className="glass-card p-6 space-y-4">
       <div className="flex justify-between items-start">
-        <div>
-          <div className="flex items-center gap-2">
-            <h4 className="font-bold text-lg text-slate-800">{material.name}</h4>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h4 style={{ fontFamily: 'Nunito, sans-serif' }} className="font-black text-lg text-warm-900">{material.name}</h4>
             {material.archive_id && (
-              <span className="bg-emerald-50 text-emerald-600 text-[9px] px-1.5 py-0.5 rounded-full font-black uppercase tracking-wider border border-emerald-100">Archivio</span>
+              <span className="badge badge-green">Magazzino</span>
             )}
           </div>
-          <div className="flex flex-col gap-1 mt-1">
-            <p className="text-xs text-slate-400 flex items-center gap-1">
-              <Wallet size={12} />
-              Costo unitario: {formatCurrency(material.unit_cost)}
-            </p>
-            {material.location && (
-              <p className="text-xs text-slate-500 flex items-center gap-1">
-                <MapPin size={12} className="text-emerald-500" />
-                {material.location}
-              </p>
-            )}
+          <div className="flex flex-col gap-0.5 mt-1">
+            <p className="text-xs text-warm-400 flex items-center gap-1"><Wallet size={11} />Costo unitario: {formatCurrency(material.unit_cost)}</p>
+            {material.location && <p className="text-xs text-warm-500 flex items-center gap-1"><MapPin size={11} className="text-sage-400" />{material.location}</p>}
           </div>
         </div>
-        <div className="flex gap-2">
-          <button onClick={onEdit} className="text-slate-300 hover:text-emerald-600 transition-colors">
-            <Pencil size={18} />
-          </button>
-          <button onClick={onDelete} className="text-slate-300 hover:text-rose-500 transition-colors">
-            <Trash2 size={18} />
-          </button>
+        <div className="flex gap-1.5 ml-2">
+          <button onClick={onEdit} className="btn-ghost p-2 text-sage-400 hover:text-sage-600"><Pencil size={16} /></button>
+          <button onClick={onDelete} className="btn-ghost p-2 text-warm-300 hover:text-blush-500"><Trash2 size={16} /></button>
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <div className="flex justify-between text-sm">
-          <span className="text-slate-500">Rimanente</span>
-          <span className={cn("font-bold", remaining < 3 ? "text-rose-600" : "text-emerald-600")}>
+          <span className="text-warm-500 font-medium">Rimanente</span>
+          <span className={cn("font-black text-sm", remaining < 3 ? "text-blush-600" : "text-sage-600")}>
             {remaining.toFixed(2)} {material.unit} ({percentage}%)
           </span>
         </div>
-        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-          <motion.div 
+        <div className="progress-track">
+          <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${percentage}%` }}
-            className={cn(
-              "h-full rounded-full transition-colors",
-              remaining < 3 ? "bg-rose-500" : "bg-emerald-500"
-            )}
+            className={cn("progress-fill", remaining < 3 && "danger")}
           />
         </div>
       </div>
 
-      <div className="pt-4 flex gap-2">
-        <input 
-          type="number" 
+      <div className="pt-2 flex gap-2">
+        <input
+          type="number"
           value={usage}
           onChange={(e) => setUsage(e.target.value)}
           placeholder={`Utilizzo (${material.unit})`}
-          className="flex-1 px-3 py-2 text-base rounded-lg border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
+          className="form-input flex-1 text-sm"
         />
-        <button 
-          onClick={() => {
-            if (usage && Number(usage) > 0) {
-              onAddUsage(Number(usage));
-              setUsage('');
-            }
-          }}
-          className="bg-slate-900 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors"
+        <button
+          onClick={() => { if (usage && Number(usage) > 0) { onAddUsage(Number(usage)); setUsage(''); } }}
+          className="btn-primary text-sm px-4"
+          style={{ padding: '10px 16px' }}
         >
           Registra
         </button>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
 function Modal({ show, onClose, title, children }: { show: boolean, onClose: () => void, title: string, children: React.ReactNode }) {
   if (!show) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden"
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.94, y: 16 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.94 }}
+        transition={{ type: 'spring', damping: 22, stiffness: 350 }}
+        className="modal-panel w-full max-w-md overflow-hidden"
       >
-        <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-          <h3 className="text-xl font-bold text-slate-800">{title}</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
-            <Plus size={24} className="rotate-45" />
-          </button>
+        <div className="p-6 border-b border-warm-100 flex justify-between items-center">
+          <h3 style={{ fontFamily: 'Nunito, sans-serif' }} className="text-xl font-black text-warm-900">{title}</h3>
+          <button onClick={onClose} className="btn-ghost p-2 rounded-xl"><X size={20} /></button>
         </div>
-        <div className="p-6">
-          {children}
-        </div>
+        <div className="p-6">{children}</div>
       </motion.div>
     </div>
   );
@@ -1644,12 +1465,9 @@ function Modal({ show, onClose, title, children }: { show: boolean, onClose: () 
 
 function Input({ label, ...props }: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
-    <div className="space-y-1">
-      <label className="text-sm font-medium text-slate-700">{label}</label>
-      <input 
-        {...props}
-        className="w-full px-4 py-2 text-base rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-      />
+    <div>
+      <label className="form-label">{label}</label>
+      <input {...props} className="form-input" />
     </div>
   );
 }
