@@ -57,6 +57,7 @@ export default function App() {
   const [viewingArchive, setViewingArchive] = useState(false);
   const [viewingInfo, setViewingInfo] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [currentTutorialStep, setCurrentTutorialStep] = useState(0);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [archiveMaterials, setArchiveMaterials] = useState<ArchiveMaterial[]>([]);
   const [income, setIncome] = useState<Income[]>([]);
@@ -1436,35 +1437,101 @@ export default function App() {
       </Modal>
 
       {/* Tutorial Modal */}
-      <Modal show={showTutorial} onClose={() => setShowTutorial(false)} title="📖 Tutorial LabManager">
-        <div className="space-y-6 py-2 max-h-[70vh] overflow-y-auto pr-2 scrollbar-thin">
-          <section className="space-y-3">
-            <h4 className="font-black text-sage-600 flex items-center gap-2 italic">1. Creare un Laboratorio</h4>
-            <p className="text-sm text-warm-700">Inizia dalla Home cliccando su <strong>"Nuovo Lab"</strong>. Assegna un nome e una descrizione. Ogni lab è un'unità di produzione indipendente.</p>
-          </section>
+      <Modal show={showTutorial} onClose={() => { setShowTutorial(false); setCurrentTutorialStep(0); }} title="📖 Guida LabManager">
+        <div className="relative overflow-hidden min-h-[400px] flex flex-col justify-between">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentTutorialStep}
+              initial={{ x: 50, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: -50, opacity: 0 }}
+              transition={{ duration: 0.3, ease: "easeInOut" }}
+              className="space-y-6 py-4 px-1"
+            >
+              {currentTutorialStep === 0 && (
+                <section className="space-y-4 text-center">
+                  <div className="w-16 h-16 bg-sage-50 text-sage-600 rounded-full flex items-center justify-center mx-auto mb-2">
+                    <Plus size={32} />
+                  </div>
+                  <h4 className="font-black text-xl text-warm-900">1. Creare un Laboratorio</h4>
+                  <p className="text-sm text-warm-700 leading-relaxed">Inizia dalla Home cliccando su <strong className="text-sage-600">"Nuovo Lab"</strong>. Ogni laboratorio è uno spazio unico dove i bambini possono esplorare la loro creatività attraverso attività dedicate.</p>
+                </section>
+              )}
 
-          <section className="space-y-3">
-            <h4 className="font-black text-sage-600 flex items-center gap-2 italic">2. Panoramica & Dashboard</h4>
-            <p className="text-sm text-warm-700">Entrando in un laboratorio, la <strong>Panoramica</strong> ti mostra subito l'utile netto, il grafico delle uscite e gli avvisi per i materiali che stanno finendo.</p>
-          </section>
+              {currentTutorialStep === 1 && (
+                <section className="space-y-4 text-center">
+                  <div className="w-16 h-16 bg-sage-50 text-sage-600 rounded-full flex items-center justify-center mx-auto mb-2">
+                    <LayoutDashboard size={32} />
+                  </div>
+                  <h4 className="font-black text-xl text-warm-900">2. Panoramica & Dashboard</h4>
+                  <p className="text-sm text-warm-700 leading-relaxed">Entrando in un laboratorio, la <strong className="text-sage-600">Panoramica</strong> ti mostra subito il bilancio, i grafici delle uscite e gli avvisi automatici per il materiale lab in esaurimento.</p>
+                </section>
+              )}
 
-          <section className="space-y-3">
-            <h4 className="font-black text-sage-600 flex items-center gap-2 italic">3. Cassa (Entrate e Uscite)</h4>
-            <p className="text-sm text-warm-700">Nella sezione <strong>Cassa</strong> registri i guadagni (quote, vendite) e le uscite (stipendi, affitti, acquisti vari). Il sistema calcola automaticamente il bilancio.</p>
-          </section>
+              {currentTutorialStep === 2 && (
+                <section className="space-y-4 text-center">
+                  <div className="w-16 h-16 bg-sage-50 text-sage-600 rounded-full flex items-center justify-center mx-auto mb-2">
+                    <TrendingUp size={32} />
+                  </div>
+                  <h4 className="font-black text-xl text-warm-900">3. Cassa (Economia)</h4>
+                  <p className="text-sm text-warm-700 leading-relaxed">Nella sezione <strong className="text-sage-600">Cassa</strong> puoi registrare le quote scritte o le vendite tramite "Entrata", mentre per stipendi o corsi puoi usare "Uscita". Tutto viene calcolato in tempo reale.</p>
+                </section>
+              )}
 
-          <section className="space-y-3">
-            <h4 className="font-black text-sage-600 flex items-center gap-2 italic">4. Gestione Materiali Lab</h4>
-            <p className="text-sm text-warm-700">In <strong>Materiali Lab</strong> inserisci quello che compri specificamente per il lab. Puoi registrare quanto materiale usi: il costo viene scalato dalle entrate e la giacenza aggiornata nel lab e nell'archivio.</p>
-          </section>
+              {currentTutorialStep === 3 && (
+                <section className="space-y-4 text-center">
+                  <div className="w-16 h-16 bg-sage-50 text-sage-600 rounded-full flex items-center justify-center mx-auto mb-2">
+                    <Package size={32} />
+                  </div>
+                  <h4 className="font-black text-xl text-warm-900">4. Materiali Lab</h4>
+                  <p className="text-sm text-warm-700 leading-relaxed">Qui gestisci il materiale specifico per i bambini. Registra quanto <strong className="text-sage-600">materiale viene usato</strong> durante le attività: il sistema aggiornerà le scorte e registrerà il costo nelle spese.</p>
+                </section>
+              )}
 
-          <section className="space-y-3">
-            <h4 className="font-black text-sage-600 flex items-center gap-2 italic">5. Magazzino (Scorta Centrale)</h4>
-            <p className="text-sm text-warm-700">Il <strong>Magazzino</strong> è la tua scorta globale. Qui carichi grandi acquisti e puoi <strong>"Inviare al Lab"</strong> le quantità specifiche. Se un lab viene chiuso, il materiale non usato resta disponibile qui per altri laboratori.</p>
-          </section>
-          
-          <div className="pt-4">
-            <button onClick={() => setShowTutorial(false)} className="btn-primary w-full py-4 rounded-2xl font-black">Ho capito, andiamo!</button>
+              {currentTutorialStep === 4 && (
+                <section className="space-y-4 text-center">
+                  <div className="w-16 h-16 bg-sage-50 text-sage-600 rounded-full flex items-center justify-center mx-auto mb-2">
+                    <Archive size={32} />
+                  </div>
+                  <h4 className="font-black text-xl text-warm-900">5. Magazzino Centrale</h4>
+                  <p className="text-sm text-warm-700 leading-relaxed">Il <strong className="text-sage-600">Magazzino</strong> è la scorta globale della scuola. Carica qui i grandi acquisti e distribuiscili nei lab via via che servono usando la funzione <strong className="text-sage-600">"Invia → Lab"</strong>.</p>
+                </section>
+              )}
+            </motion.div>
+          </AnimatePresence>
+
+          <div className="pt-6 border-t border-warm-100 mt-4">
+            <div className="flex justify-between items-center gap-4">
+              <button 
+                disabled={currentTutorialStep === 0}
+                onClick={() => setCurrentTutorialStep(s => s - 1)}
+                className={cn("px-4 py-2 font-bold text-sm transition-all", currentTutorialStep === 0 ? "opacity-0 pointer-events-none" : "text-warm-400 hover:text-warm-600")}
+              >
+                Indietro
+              </button>
+              
+              <div className="flex gap-1.5">
+                {[0,1,2,3,4].map(s => (
+                  <div key={s} className={cn("w-2 h-2 rounded-full transition-all duration-300", s === currentTutorialStep ? "bg-sage-500 w-4" : "bg-warm-200")} />
+                ))}
+              </div>
+
+              {currentTutorialStep < 4 ? (
+                <button 
+                  onClick={() => setCurrentTutorialStep(s => s + 1)}
+                  className="btn-primary py-2 px-6 rounded-xl font-bold text-sm"
+                >
+                  Avanti
+                </button>
+              ) : (
+                <button 
+                  onClick={() => { setShowTutorial(false); setCurrentTutorialStep(0); }}
+                  className="btn-primary py-2 px-6 rounded-xl font-bold text-sm"
+                >
+                  Finito!
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </Modal>
