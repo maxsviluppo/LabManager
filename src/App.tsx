@@ -109,10 +109,15 @@ export default function App() {
         fetch(`/api/summary?laboratory_id=${labId}`)
       ]);
       
-      setMaterials(await mRes.json());
-      setIncome(await iRes.json());
-      setExpenses(await eRes.json());
-      setSummary(await sRes.json());
+      if (mRes.ok) setMaterials(await mRes.json());
+      if (iRes.ok) setIncome(await iRes.json());
+      if (eRes.ok) setExpenses(await eRes.json());
+      if (sRes.ok) {
+        const sData = await sRes.json();
+        if (sData && sData.breakdown) {
+          setSummary(sData);
+        }
+      }
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -646,10 +651,10 @@ export default function App() {
     );
   }
 
-  const pieData = summary ? [
-    { name: 'Materiali', value: summary.breakdown.materials, color: '#10b981' },
-    { name: 'Stipendi', value: summary.breakdown.salaries, color: '#3b82f6' },
-    { name: 'Altro', value: summary.breakdown.other, color: '#f59e0b' },
+  const pieData = (summary && summary.breakdown) ? [
+    { name: 'Materiali', value: summary.breakdown.materials || 0, color: '#10b981' },
+    { name: 'Stipendi', value: summary.breakdown.salaries || 0, color: '#3b82f6' },
+    { name: 'Altro', value: summary.breakdown.other || 0, color: '#f59e0b' },
   ].filter(d => d.value > 0) : [];
 
   const sortedArchiveMaterials = [...archiveMaterials].sort((a, b) => {
@@ -811,19 +816,19 @@ export default function App() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <StatCard 
                   title="Totale Utile Netto" 
-                  value={formatCurrency(summary.netProfit)} 
+                  value={formatCurrency(summary?.netProfit || 0)} 
                   icon={<Landmark className="text-blue-600" />}
                   highlight={true}
                 />
                 <StatCard 
                   title="Entrate Totali" 
-                  value={formatCurrency(summary.totalIncome)} 
+                  value={formatCurrency(summary?.totalIncome || 0)} 
                   icon={<ArrowUpRight className="text-emerald-600" />}
                   trend="positive"
                 />
                 <StatCard 
                   title="Uscite Totali" 
-                  value={formatCurrency(summary.totalExpenses)} 
+                  value={formatCurrency(summary?.totalExpenses || 0)} 
                   icon={<ArrowDownRight className="text-rose-600" />}
                   trend="negative"
                 />
