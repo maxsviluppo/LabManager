@@ -151,9 +151,12 @@ export default function App() {
     }
   }, [user, selectedLab]);
 
+  const [technicalError, setTechnicalError] = useState('');
+
   const handleAuth = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoginError('');
+    setTechnicalError('');
     const formData = new FormData(e.currentTarget);
     const username = formData.get('username') as string;
     const password = formData.get('password') as string;
@@ -161,23 +164,33 @@ export default function App() {
     const endpoint = isRegistering ? '/api/auth/register' : '/api/auth/login';
 
     try {
+      console.log(`Sending auth request to ${endpoint}...`);
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
       
-      const data = await res.json();
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (parseErr) {
+        setLoginError('Il server ha risposto con un formato non valido (probabile crash del backend).');
+        setTechnicalError(text.substring(0, 500));
+        return;
+      }
       
       if (res.ok) {
         setUser(data);
       } else {
-        // Mostra l'errore specifico restituito dal server (es. "DATABASE_URL non configurata")
         setLoginError(data.error || `Errore del server (${res.status})`);
+        setTechnicalError(JSON.stringify(data, null, 2));
       }
     } catch (e) {
       console.error("Fetch error:", e);
-      setLoginError(`Impossibile raggiungere il server: ${(e as Error).message}. Controlla i log di Vercel.`);
+      setLoginError(`Connessione impossibile: ${(e as Error).message}.`);
+      setTechnicalError((e as Error).stack || '');
     }
   };
 
@@ -437,12 +450,21 @@ export default function App() {
               </div>
 
               {loginError && (
-                <div className="text-rose-600 text-xs font-bold bg-rose-50 p-3 rounded-xl border border-rose-100 flex flex-col gap-1">
+                <div className="text-rose-600 text-xs font-bold bg-rose-50 p-4 rounded-xl border border-rose-100 flex flex-col gap-2">
                   <div className="flex items-center gap-2">
                     <AlertCircle size={14} />
                     <span>Errore:</span>
                   </div>
-                  <p className="opacity-80 break-words">{loginError}</p>
+                  <p className="opacity-80 break-words leading-relaxed">{loginError}</p>
+                  
+                  {technicalError && (
+                    <details className="mt-2 bg-white/50 p-2 rounded-lg border border-rose-200">
+                      <summary className="cursor-pointer text-[10px] text-rose-400 uppercase tracking-widest hover:text-rose-600">Dettagli tecnici</summary>
+                      <pre className="mt-2 text-[10px] font-mono overflow-auto max-h-32 text-slate-600 whitespace-pre-wrap">
+                        {technicalError}
+                      </pre>
+                    </details>
+                  )}
                 </div>
               )}
 
