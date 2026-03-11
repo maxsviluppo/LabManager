@@ -166,14 +166,18 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
+      
       const data = await res.json();
+      
       if (res.ok) {
         setUser(data);
       } else {
-        setLoginError(data.error || 'Errore durante l\'operazione');
+        // Mostra l'errore specifico restituito dal server (es. "DATABASE_URL non configurata")
+        setLoginError(data.error || `Errore del server (${res.status})`);
       }
     } catch (e) {
-      setLoginError('Connessione al server fallita. Verifica la tua connessione o riprova più tardi.');
+      console.error("Fetch error:", e);
+      setLoginError(`Impossibile raggiungere il server: ${(e as Error).message}. Controlla i log di Vercel.`);
     }
   };
 
