@@ -63,6 +63,7 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [loginError, setLoginError] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
 
   // Form states
   const [showLabForm, setShowLabForm] = useState(false);
@@ -150,15 +151,17 @@ export default function App() {
     }
   }, [user, selectedLab]);
 
-  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAuth = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoginError('');
     const formData = new FormData(e.currentTarget);
     const username = formData.get('username') as string;
     const password = formData.get('password') as string;
 
+    const endpoint = isRegistering ? '/api/auth/register' : '/api/auth/login';
+
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
@@ -167,10 +170,10 @@ export default function App() {
       if (res.ok) {
         setUser(data);
       } else {
-        setLoginError(data.error || 'Errore durante il login');
+        setLoginError(data.error || 'Errore durante l\'operazione');
       }
     } catch (e) {
-      setLoginError('Connessione al server fallita');
+      setLoginError('Connessione al server fallita. Verifica la tua connessione o riprova più tardi.');
     }
   };
 
@@ -396,11 +399,11 @@ export default function App() {
               <LayoutDashboard className="text-white w-8 h-8" />
             </div>
             <h1 className="text-3xl font-black text-slate-900 tracking-tight">LabManager</h1>
-            <p className="text-slate-500 font-medium">Accedi per gestire la tua attività</p>
+            <p className="text-slate-500 font-medium">{isRegistering ? 'Crea un nuovo account' : 'Accedi per gestire la tua attività'}</p>
           </div>
 
           <div className="glass-card p-8 space-y-6">
-            <form onSubmit={handleLogin} className="space-y-4">
+            <form onSubmit={handleAuth} className="space-y-4">
               <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Username</label>
                 <div className="relative">
@@ -430,23 +433,40 @@ export default function App() {
               </div>
 
               {loginError && (
-                <p className="text-rose-600 text-sm font-bold bg-rose-50 p-3 rounded-xl border border-rose-100 flex items-center gap-2">
-                  <AlertCircle size={16} />
-                  {loginError}
-                </p>
+                <div className="text-rose-600 text-xs font-bold bg-rose-50 p-3 rounded-xl border border-rose-100 flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle size={14} />
+                    <span>Errore:</span>
+                  </div>
+                  <p className="opacity-80 break-words">{loginError}</p>
+                </div>
               )}
 
               <button 
                 type="submit"
                 className="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-lg active:scale-[0.98] mt-2"
               >
-                Accedi
+                {isRegistering ? 'Registrati' : 'Accedi'}
               </button>
             </form>
+
+            <div className="pt-4 border-t border-slate-100 text-center">
+              <button 
+                onClick={() => {
+                  setIsRegistering(!isRegistering);
+                  setLoginError('');
+                }}
+                className="text-emerald-600 font-bold text-sm hover:underline"
+              >
+                {isRegistering ? 'Hai già un account? Accedi' : 'Non hai un account? Registrati'}
+              </button>
+            </div>
           </div>
-          <p className="text-center text-slate-400 text-sm mt-8">
-            Credenziali predefinite: <span className="font-bold text-slate-600">admin / admin</span>
-          </p>
+          {!isRegistering && (
+            <p className="text-center text-slate-400 text-sm mt-8">
+              Credenziali predefinite: <span className="font-bold text-slate-600">admin / admin</span>
+            </p>
+          )}
         </motion.div>
       </div>
     );

@@ -128,9 +128,39 @@ async function startServer() {
   };
 
   // --- Auth Routes ---
+  app.post("/api/auth/register", async (req, res) => {
+    const { username, password } = req.body;
+    try {
+      if (!username || !password) return res.status(400).json({ error: "Username e password obbligatori" });
+      
+      const existing = await sql`SELECT id FROM users WHERE username = ${username}`;
+      if (existing.length > 0) return res.status(400).json({ error: "Username gia esistente" });
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const result = await sql`INSERT INTO users (username, password) VALUES (${username}, ${hashedPassword}) RETURNING id, username`;
+      
+      const user = result[0];
+      const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: "7d" });
+      
+      res.cookie("token", token, { 
+        httpOnly: true, 
+        secure: true,
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000 
+      });
+      
+      res.json({ id: user.id, username: user.username });
+    } catch (err) {
+      console.error("Register error:", err);
+      res.status(500).json({ error: "Errore durante la registrazione: " + (err as Error).message });
+    }
+  });
+
   app.post("/api/auth/login", async (req, res) => {
     const { username, password } = req.body;
     try {
+      if (!username || !password) return res.status(400).json({ error: "Username e password obbligatori" });
+
       const userResult = await sql`SELECT * FROM users WHERE username = ${username}`;
       const user = userResult[0];
 
@@ -142,14 +172,14 @@ async function startServer() {
       const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: "7d" });
       res.cookie("token", token, { 
         httpOnly: true, 
-        secure: process.env.NODE_ENV === "production" || !!process.env.VERCEL, 
+        secure: true,
         sameSite: 'lax',
         maxAge: 7 * 24 * 60 * 60 * 1000 
       });
       res.json({ id: user.id, username: user.username });
     } catch (err) {
       console.error("Login error:", err);
-      res.status(500).json({ error: "Errore interno del server" });
+      res.status(500).json({ error: "Errore di connessione al database: " + (err as Error).message });
     }
   });
 
