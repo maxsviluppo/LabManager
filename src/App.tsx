@@ -16,6 +16,7 @@ import {
   AlertCircle,
   History,
   Wallet,
+  Landmark,
   Users,
   Box,
   Pencil,
@@ -26,7 +27,9 @@ import {
   Home,
   X,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  Lock,
+  User
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -57,6 +60,9 @@ export default function App() {
     breakdown: { materials: 0, salaries: 0, other: 0 }
   });
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [loginError, setLoginError] = useState('');
 
   // Form states
   const [showLabForm, setShowLabForm] = useState(false);
@@ -113,17 +119,66 @@ export default function App() {
     }
   };
 
+  const checkAuth = async () => {
+    try {
+      const res = await fetch('/api/auth/me');
+      const data = await res.json();
+      setUser(data);
+    } catch (e) {
+      setUser(null);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
   useEffect(() => {
-    fetchLabs().finally(() => setLoading(false));
-    fetchArchive();
+    checkAuth();
   }, []);
 
   useEffect(() => {
-    if (selectedLab) {
+    if (user) {
+      setLoading(true);
+      fetchLabs().finally(() => setLoading(false));
+      fetchArchive();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user && selectedLab) {
       setLoading(true);
       fetchData(selectedLab.id);
     }
-  }, [selectedLab]);
+  }, [user, selectedLab]);
+
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoginError('');
+    const formData = new FormData(e.currentTarget);
+    const username = formData.get('username') as string;
+    const password = formData.get('password') as string;
+
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setUser(data);
+      } else {
+        setLoginError(data.error || 'Errore durante il login');
+      }
+    } catch (e) {
+      setLoginError('Connessione al server fallita');
+    }
+  };
+
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    setUser(null);
+    setSelectedLab(null);
+  };
 
   const handleAddLab = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -133,16 +188,26 @@ export default function App() {
       description: formData.get('description') as string,
     };
 
-    const res = await fetch('/api/laboratories', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    const { id } = await res.json();
-    setShowLabForm(false);
-    const labs = await fetchLabs();
-    const newLab = labs.find((l: Laboratory) => l.id === id);
-    if (newLab) setSelectedLab(newLab);
+    try {
+      const res = await fetch('/api/laboratories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (res.ok) {
+        const { id } = await res.json();
+        setShowLabForm(false);
+        const labs = await fetchLabs();
+        const newLab = labs.find((l: Laboratory) => l.id === id);
+        if (newLab) setSelectedLab(newLab);
+      } else if (res.status === 401) {
+        setUser(null);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setShowLabForm(false);
+    }
   };
 
   const handleAddMaterial = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -310,6 +375,83 @@ export default function App() {
     }
   };
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-md"
+        >
+          <div className="text-center mb-8">
+            <div className="bg-emerald-600 w-16 h-16 rounded-2xl shadow-xl shadow-emerald-200 flex items-center justify-center mx-auto mb-4">
+              <LayoutDashboard className="text-white w-8 h-8" />
+            </div>
+            <h1 className="text-3xl font-black text-slate-900 tracking-tight">LabManager</h1>
+            <p className="text-slate-500 font-medium">Accedi per gestire la tua attività</p>
+          </div>
+
+          <div className="glass-card p-8 space-y-6">
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Username</label>
+                <div className="relative">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <input 
+                    name="username"
+                    type="text"
+                    required
+                    placeholder="Il tuo username"
+                    className="w-full pl-12 pr-4 py-3 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all bg-slate-50/50"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Password</label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <input 
+                    name="password"
+                    type="password"
+                    required
+                    placeholder="••••••••"
+                    className="w-full pl-12 pr-4 py-3 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all bg-slate-50/50"
+                  />
+                </div>
+              </div>
+
+              {loginError && (
+                <p className="text-rose-600 text-sm font-bold bg-rose-50 p-3 rounded-xl border border-rose-100 flex items-center gap-2">
+                  <AlertCircle size={16} />
+                  {loginError}
+                </p>
+              )}
+
+              <button 
+                type="submit"
+                className="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-lg active:scale-[0.98] mt-2"
+              >
+                Accedi
+              </button>
+            </form>
+          </div>
+          <p className="text-center text-slate-400 text-sm mt-8">
+            Credenziali predefinite: <span className="font-bold text-slate-600">admin / admin</span>
+          </p>
+        </motion.div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -419,7 +561,9 @@ export default function App() {
                   <ArrowUpRight size={16} />
                 </div>
                 <div className="text-right">
-                  <div className="text-[10px] uppercase font-black text-slate-400 tracking-widest">Utile Netto</div>
+                  <div className="text-[10px] uppercase font-black text-slate-400 tracking-widest flex items-center justify-end gap-1">
+                    <Landmark size={12} className="text-slate-400" /> Totale Utile Netto
+                  </div>
                   <div className={cn(
                     "font-bold text-lg",
                     (lab.netProfit || 0) >= 0 ? "text-emerald-600" : "text-rose-600"
@@ -496,14 +640,11 @@ export default function App() {
           <h1 className="font-bold text-lg tracking-tight text-slate-800">LabManager</h1>
         </div>
         <button 
-          onClick={() => {
-            setSelectedLab(null);
-            setViewingArchive(false);
-          }}
-          className="text-emerald-600 hover:bg-emerald-50 p-2 rounded-lg transition-colors"
-          title="Torna alla Home"
+          onClick={handleLogout}
+          className="text-slate-400 hover:text-rose-500 p-2 rounded-lg transition-colors border border-transparent hover:border-rose-100 hover:bg-rose-50"
+          title="Esci"
         >
-          <Home size={24} />
+          <LogOut size={24} />
         </button>
       </div>
 
@@ -525,14 +666,11 @@ export default function App() {
               {viewingArchive ? "Archivio Globale" : selectedLab?.name}
             </div>
             <button 
-              onClick={() => {
-                setSelectedLab(null);
-                setViewingArchive(false);
-              }}
-              className="text-emerald-600 hover:text-emerald-700 transition-all mt-2 p-1 hover:bg-emerald-50 rounded-lg inline-flex items-center justify-center"
-              title="Torna alla Home"
+              onClick={handleLogout}
+              className="text-slate-400 hover:text-rose-600 transition-all mt-2 p-1 hover:bg-rose-50 rounded-lg inline-flex items-center justify-center font-bold text-xs gap-1"
+              title="Esci"
             >
-              <Home size={24} />
+              <LogOut size={16} /> Logout
             </button>
           </div>
         </div>
@@ -560,22 +698,26 @@ export default function App() {
         ) : (
           <>
             <NavItem 
-              active={activeTab === 'dashboard'} 
-              onClick={() => setActiveTab('dashboard')}
-              icon={<LayoutDashboard size={20} />}
-              label="Home"
-            />
-            <NavItem 
-              active={activeTab === 'inventory'} 
-              onClick={() => setActiveTab('inventory')}
-              icon={<Package size={20} />}
-              label="Scorte"
+              active={false} 
+              onClick={() => {
+                setSelectedLab(null);
+                setViewingArchive(false);
+                setActiveTab('dashboard');
+              }}
+              icon={<Box size={20} />}
+              label="Laboratori"
             />
             <NavItem 
               active={activeTab === 'finances'} 
               onClick={() => setActiveTab('finances')}
               icon={<TrendingUp size={20} />}
               label="Cassa"
+            />
+            <NavItem 
+              active={activeTab === 'inventory'} 
+              onClick={() => setActiveTab('inventory')}
+              icon={<Package size={20} />}
+              label="Materiale Lab"
             />
             <NavItem 
               active={activeTab === 'archive'} 
@@ -613,7 +755,7 @@ export default function App() {
                 <StatCard 
                   title="Totale Utile Netto" 
                   value={formatCurrency(summary.netProfit)} 
-                  icon={<Wallet className="text-blue-600" />}
+                  icon={<Landmark className="text-blue-600" />}
                   highlight={true}
                 />
                 <StatCard 
@@ -678,7 +820,7 @@ export default function App() {
                 <div className="glass-card p-6">
                   <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
                     <AlertCircle size={20} className="text-amber-500" />
-                    Scorte in Esaurimento
+                    Materiale Lab in Esaurimento
                   </h3>
                   <div className="space-y-4">
                     {materials.filter(m => (m.total_quantity - m.used_quantity) < 3).length > 0 ? (
@@ -697,7 +839,7 @@ export default function App() {
                         ))
                     ) : (
                       <div className="h-full flex items-center justify-center text-slate-400 italic py-12">
-                        Tutte le scorte sono ok
+                        Tutto il materiale lab è ok
                       </div>
                     )}
                   </div>
