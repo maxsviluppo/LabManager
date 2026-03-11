@@ -89,13 +89,20 @@ async function initializeDatabase() {
   }
 }
 
+const app = express();
+
 async function startServer() {
   await initializeDatabase();
-  const app = express();
+  
   app.use(express.json());
   app.use(cookieParser());
   
   const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3005;
+
+  // --- Health/Test Route ---
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", database: !!process.env.DATABASE_URL, env: process.env.NODE_ENV });
+  });
 
   // --- Auth Middleware ---
   const authenticateToken = (req: any, res: any, next: any) => {
@@ -114,21 +121,27 @@ async function startServer() {
   // --- Auth Routes ---
   app.post("/api/auth/login", async (req, res) => {
     const { username, password } = req.body;
-    const userResult = await sql`SELECT * FROM users WHERE username = ${username}`;
-    const user = userResult[0];
+    try {
+      const userResult = await sql`SELECT * FROM users WHERE username = ${username}`;
+      const user = userResult[0];
 
-    if (!user) return res.status(400).json({ error: "Utente non trovato" });
+      if (!user) return res.status(400).json({ error: "Utente non trovato" });
 
-    const validPass = await bcrypt.compare(password, user.password);
-    if (!validPass) return res.status(400).json({ error: "Password errata" });
+      const validPass = await bcrypt.compare(password, user.password);
+      if (!validPass) return res.status(400).json({ error: "Password errata" });
 
-    const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: "7d" });
-    res.cookie("token", token, { 
-      httpOnly: true, 
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 7 * 24 * 60 * 60 * 1000 
-    });
-    res.json({ id: user.id, username: user.username });
+      const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: "7d" });
+      res.cookie("token", token, { 
+        httpOnly: true, 
+        secure: process.env.NODE_ENV === "production" || !!process.env.VERCEL, 
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000 
+      });
+      res.json({ id: user.id, username: user.username });
+    } catch (err) {
+      console.error("Login error:", err);
+      res.status(500).json({ error: "Errore interno del server" });
+    }
   });
 
   app.post("/api/auth/logout", (req, res) => {
@@ -402,7 +415,8 @@ async function startServer() {
   });
 
   // --- Vite Middleware ---
-  if (process.env.NODE_ENV !== "production") {
+  // Only use Vite if we are NOT on Vercel and NOT in production
+  if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
     const vite = await createViteServer({
       server: { middlewareMode: true, hmr: { port: 24685 } },
       appType: "spa",
@@ -415,10 +429,14 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-    console.log("Vite middleware attached.");
-  });
+  // Only listen locally, Vercel will export the app
+  if (!process.env.VERCEL) {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  }
 }
 
 startServer().catch(console.error);
+
+export default app;
