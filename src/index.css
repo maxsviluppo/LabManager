@@ -202,6 +202,27 @@
   box-shadow: inset 0 0 0 1.5px rgba(74, 138, 104, 0.18);
 }
 
+@media (max-width: 768px) {
+  .sidebar { 
+    height: auto; 
+    padding: 6px !important;
+    gap: 2px !important;
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.05);
+  }
+  .nav-item { 
+    flex: 1;
+    flex-direction: column;
+    padding: 6px 2px !important;
+    gap: 4px !important;
+    font-size: 10px !important;
+    text-align: center;
+    border-radius: 10px;
+    min-width: 0;
+  }
+  .nav-item span { display: block; }
+}
+
+
 /* === LOGO / BRAND === */
 
 .brand-logo {

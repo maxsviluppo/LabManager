@@ -734,7 +734,7 @@ export default function App() {
                       <span className="text-[10px] font-black text-sage-500 uppercase tracking-widest flex items-center gap-1">Entra <ArrowUpRight size={12} /></span>
                       <div className="text-right">
                         <div className="text-[9px] uppercase font-black text-warm-300 tracking-widest mb-0.5">Utile Netto</div>
-                        <div className={cn("font-black text-base", (lab.netProfit || 0) >= 0 ? "text-sage-600" : "text-blush-600")}>
+                        <div className={cn("font-black text-2xl", (lab.netProfit || 0) >= 0 ? "text-sage-600" : "text-blush-600")}>
                           {formatCurrency(lab.netProfit || 0)}
                         </div>
                       </div>
@@ -852,7 +852,7 @@ export default function App() {
             </motion.div>
           )}
 
-          {activeTab === 'inventory' && (
+          {activeTab === 'inventory' && selectedLab && (
             <motion.div
               key="inventory"
               initial={{ opacity: 0, y: 20 }}
@@ -902,7 +902,7 @@ export default function App() {
             </motion.div>
           )}
 
-          {activeTab === 'finances' && (
+          {activeTab === 'finances' && selectedLab && (
             <motion.div
               key="finances"
               initial={{ opacity: 0, y: 20 }}

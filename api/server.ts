@@ -30,17 +30,30 @@ async function ensureSchema() {
   try {
     // Individual queries for better compatibility with serverless HTTP driver
     await sql`CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username TEXT NOT NULL UNIQUE, password TEXT NOT NULL)`;
-    await sql`CREATE TABLE IF NOT EXISTS laboratories (id SERIAL PRIMARY KEY, name TEXT NOT NULL, description TEXT)`;
+    await sql`CREATE TABLE IF NOT EXISTS laboratories (id SERIAL PRIMARY KEY, user_id INTEGER, name TEXT NOT NULL, description TEXT)`;
     await sql`CREATE TABLE IF NOT EXISTS materials (id SERIAL PRIMARY KEY, laboratory_id INTEGER, name TEXT NOT NULL, unit TEXT NOT NULL, total_quantity REAL DEFAULT 0, used_quantity REAL DEFAULT 0, unit_cost REAL DEFAULT 0, location TEXT, archive_id INTEGER, FOREIGN KEY (laboratory_id) REFERENCES laboratories(id))`;
     await sql`CREATE TABLE IF NOT EXISTS income (id SERIAL PRIMARY KEY, laboratory_id INTEGER, description TEXT NOT NULL, amount REAL NOT NULL, date TEXT NOT NULL, FOREIGN KEY (laboratory_id) REFERENCES laboratories(id))`;
     await sql`CREATE TABLE IF NOT EXISTS expenses (id SERIAL PRIMARY KEY, laboratory_id INTEGER, category TEXT NOT NULL, description TEXT NOT NULL, amount REAL NOT NULL, date TEXT NOT NULL, material_id INTEGER, FOREIGN KEY (laboratory_id) REFERENCES laboratories(id), FOREIGN KEY (material_id) REFERENCES materials(id))`;
-    await sql`CREATE TABLE IF NOT EXISTS material_archive (id SERIAL PRIMARY KEY, name TEXT NOT NULL UNIQUE, unit TEXT NOT NULL, quantity REAL DEFAULT 0)`;
+    await sql`CREATE TABLE IF NOT EXISTS material_archive (id SERIAL PRIMARY KEY, user_id INTEGER, name TEXT NOT NULL, unit TEXT NOT NULL, quantity REAL DEFAULT 0)`;
+
+    // Migrations for existing DBs
+    try { await sql`ALTER TABLE laboratories ADD COLUMN IF NOT EXISTS user_id INTEGER`; } catch(e){}
+    try { await sql`ALTER TABLE material_archive ADD COLUMN IF NOT EXISTS user_id INTEGER`; } catch(e){}
+    try { await sql`ALTER TABLE material_archive DROP CONSTRAINT IF EXISTS material_archive_name_key`; } catch(e){}
 
     const users = await sql`SELECT 1 FROM users LIMIT 1`;
     if (users.length === 0) {
       const hp = await bcrypt.hash("admin", 10);
       await sql`INSERT INTO users (username, password) VALUES ('admin', ${hp})`;
     }
+
+    // Assign orphaned data to first user
+    const firstUser = await sql`SELECT id FROM users ORDER BY id ASC LIMIT 1`;
+    if (firstUser[0]) {
+      await sql`UPDATE laboratories SET user_id = ${firstUser[0].id} WHERE user_id IS NULL`;
+      await sql`UPDATE material_archive SET user_id = ${firstUser[0].id} WHERE user_id IS NULL`;
+    }
+
     _schemaDone = true;
   } catch (e) {
     console.error("Schema error:", e);
@@ -115,7 +128,7 @@ const authMiddleware = (req: any, res: any, next: any) => {
 // --- DATA ---
 app.get("/api/laboratories", authMiddleware, wrap(async (req, res) => {
   const sql = getSql();
-  const labs = await sql`SELECT * FROM laboratories`;
+  const labs = await sql`SELECT * FROM laboratories WHERE user_id = ${req.user.id}`;
   const labsWithProfit = await Promise.all(labs.map(async (l) => {
     const i = await sql`SELECT SUM(amount) as t FROM income WHERE laboratory_id = ${l.id}`;
     const e = await sql`SELECT SUM(amount) as t FROM expenses WHERE laboratory_id = ${l.id}`;
@@ -126,13 +139,17 @@ app.get("/api/laboratories", authMiddleware, wrap(async (req, res) => {
 
 app.post("/api/laboratories", authMiddleware, wrap(async (req, res) => {
   const sql = getSql();
-  const r = await sql`INSERT INTO laboratories (name, description) VALUES (${req.body.name}, ${req.body.description}) RETURNING *`;
+  const r = await sql`INSERT INTO laboratories (user_id, name, description) VALUES (${req.user.id}, ${req.body.name}, ${req.body.description}) RETURNING *`;
   res.json(r[0]);
 }));
 
 app.delete("/api/laboratories/:id", authMiddleware, wrap(async (req, res) => {
   const sql = getSql();
   const id = parseInt(req.params.id);
+  // Security check: ensure lab belongs to user
+  const check = await sql`SELECT 1 FROM laboratories WHERE id = ${id} AND user_id = ${req.user.id}`;
+  if (check.length === 0) return res.status(403).json({ error: "Forbidden" });
+
   await sql`DELETE FROM materials WHERE laboratory_id = ${id}`;
   await sql`DELETE FROM income WHERE laboratory_id = ${id}`;
   await sql`DELETE FROM expenses WHERE laboratory_id = ${id}`;
@@ -143,6 +160,10 @@ app.delete("/api/laboratories/:id", authMiddleware, wrap(async (req, res) => {
 app.post("/api/laboratories/:id/clear", authMiddleware, wrap(async (req, res) => {
   const sql = getSql();
   const id = parseInt(req.params.id);
+  // Security check
+  const check = await sql`SELECT 1 FROM laboratories WHERE id = ${id} AND user_id = ${req.user.id}`;
+  if (check.length === 0) return res.status(403).json({ error: "Forbidden" });
+
   await sql`DELETE FROM materials WHERE laboratory_id = ${id}`;
   await sql`DELETE FROM income WHERE laboratory_id = ${id}`;
   await sql`DELETE FROM expenses WHERE laboratory_id = ${id}`;
@@ -152,21 +173,30 @@ app.post("/api/laboratories/:id/clear", authMiddleware, wrap(async (req, res) =>
 // Materials
 app.get("/api/materials", authMiddleware, wrap(async (req, res) => {
   const sql = getSql();
-  res.json(await sql`SELECT * FROM materials WHERE laboratory_id = ${parseInt(req.query.laboratory_id as string)}`);
+  const lid = parseInt(req.query.laboratory_id as string);
+  // Security check: ensure lab belongs to user
+  const check = await sql`SELECT 1 FROM laboratories WHERE id = ${lid} AND user_id = ${req.user.id}`;
+  if (check.length === 0) return res.status(403).json({ error: "Forbidden" });
+
+  res.json(await sql`SELECT * FROM materials WHERE laboratory_id = ${lid}`);
 }));
 
 app.post("/api/materials", authMiddleware, wrap(async (req, res) => {
   const sql = getSql();
   const { laboratory_id, name, unit, total_quantity, unit_cost, location } = req.body;
   
-  // 1. Sync with Archive (Magazzino)
-  let archive = await sql`SELECT id FROM material_archive WHERE name = ${name}`;
+  // Security check
+  const check = await sql`SELECT 1 FROM laboratories WHERE id = ${laboratory_id} AND user_id = ${req.user.id}`;
+  if (check.length === 0) return res.status(403).json({ error: "Forbidden" });
+
+  // 1. Sync with Archive (Magazzino) - Filtered by user
+  let archive = await sql`SELECT id FROM material_archive WHERE name = ${name} AND user_id = ${req.user.id}`;
   let final_archive_id;
   if (archive[0]) {
     final_archive_id = archive[0].id;
     await sql`UPDATE material_archive SET quantity = quantity + ${total_quantity} WHERE id = ${final_archive_id}`;
   } else {
-    const archRes = await sql`INSERT INTO material_archive (name, unit, quantity) VALUES (${name}, ${unit}, ${total_quantity}) RETURNING id`;
+    const archRes = await sql`INSERT INTO material_archive (user_id, name, unit, quantity) VALUES (${req.user.id}, ${name}, ${unit}, ${total_quantity}) RETURNING id`;
     final_archive_id = archRes[0].id;
   }
 
@@ -265,34 +295,42 @@ app.delete("/api/expenses/:id", authMiddleware, wrap(async (req, res) => {
 // Archive
 app.get("/api/archive", authMiddleware, wrap(async (req, res) => {
   const sql = getSql();
-  res.json(await sql`SELECT * FROM material_archive ORDER BY name ASC`);
+  res.json(await sql`SELECT * FROM material_archive WHERE user_id = ${req.user.id} ORDER BY name ASC`);
 }));
 
 app.post("/api/archive", authMiddleware, wrap(async (req, res) => {
   const sql = getSql();
   const { name, unit, quantity } = req.body;
-  await sql`INSERT INTO material_archive (name, unit, quantity) VALUES (${name}, ${unit}, ${quantity || 0})`;
+  await sql`INSERT INTO material_archive (user_id, name, unit, quantity) VALUES (${req.user.id}, ${name}, ${unit}, ${quantity || 0})`;
   res.json({ success: true });
 }));
 
 app.delete("/api/archive/:id", authMiddleware, wrap(async (req, res) => {
   const sql = getSql();
-  await sql`DELETE FROM material_archive WHERE id = ${parseInt(req.params.id)}`;
+  const id = parseInt(req.params.id);
+  await sql`DELETE FROM material_archive WHERE id = ${id} AND user_id = ${req.user.id}`;
   res.json({ success: true });
 }));
 
 app.put("/api/archive/:id", authMiddleware, wrap(async (req, res) => {
   const sql = getSql();
   const { name, unit, quantity } = req.body;
-  await sql`UPDATE material_archive SET name = ${name}, unit = ${unit}, quantity = ${quantity} WHERE id = ${parseInt(req.params.id)}`;
+  await sql`UPDATE material_archive SET name = ${name}, unit = ${unit}, quantity = ${quantity} WHERE id = ${parseInt(req.params.id)} AND user_id = ${req.user.id}`;
   res.json({ success: true });
 }));
 
 app.post("/api/archive/transfer", authMiddleware, wrap(async (req, res) => {
   const sql = getSql();
   const { archive_id, laboratory_id, quantity } = req.body;
-  const a = await sql`SELECT * FROM material_archive WHERE id = ${archive_id}`;
-  if (!a[0] || Number(a[0].quantity) < quantity) return res.status(400).json({ error: "Insufficient quantity" });
+
+  // Security check: ensure archive item belongs to user
+  const a = await sql`SELECT * FROM material_archive WHERE id = ${archive_id} AND user_id = ${req.user.id}`;
+  if (!a[0] || Number(a[0].quantity) < quantity) return res.status(400).json({ error: "Insufficient quantity or item not found" });
+
+  // Security check: ensure lab belongs to user
+  const checkLab = await sql`SELECT 1 FROM laboratories WHERE id = ${laboratory_id} AND user_id = ${req.user.id}`;
+  if (checkLab.length === 0) return res.status(403).json({ error: "Forbidden" });
+
   await sql`UPDATE material_archive SET quantity = quantity - ${quantity} WHERE id = ${archive_id}`;
   const ex = await sql`SELECT * FROM materials WHERE laboratory_id = ${laboratory_id} AND archive_id = ${archive_id}`;
   if (ex[0]) {
