@@ -675,7 +675,52 @@ export default function App() {
           </div>
         </div>
 
-        {viewingArchive ? (
+        {/* Home Button (List of Labs) */}
+        <NavItem 
+          active={!selectedLab && !viewingArchive} 
+          onClick={() => {
+            setSelectedLab(null);
+            setViewingArchive(false);
+          }}
+          icon={<Home size={20} />}
+          label="Home"
+        />
+
+        {!viewingArchive ? (
+          <>
+            {selectedLab && (
+              <>
+                <NavItem 
+                  active={activeTab === 'dashboard'} 
+                  onClick={() => setActiveTab('dashboard')}
+                  icon={<LayoutDashboard size={20} />}
+                  label="Laboratorio"
+                />
+                <NavItem 
+                  active={activeTab === 'finances'} 
+                  onClick={() => setActiveTab('finances')}
+                  icon={<TrendingUp size={20} />}
+                  label="Cassa"
+                />
+                <NavItem 
+                  active={activeTab === 'inventory'} 
+                  onClick={() => setActiveTab('inventory')}
+                  icon={<Package size={20} />}
+                  label="Materiale Lab"
+                />
+              </>
+            )}
+            <NavItem 
+              active={false} 
+              onClick={() => {
+                setViewingArchive(true);
+                setActiveTab('archive');
+              }}
+              icon={<Archive size={20} />}
+              label="Magazzino"
+            />
+          </>
+        ) : (
           <>
             <NavItem 
               active={activeTab === 'archive'} 
@@ -694,40 +739,6 @@ export default function App() {
                 label="Torna al Lab"
               />
             )}
-          </>
-        ) : (
-          <>
-            <NavItem 
-              active={false} 
-              onClick={() => {
-                setSelectedLab(null);
-                setViewingArchive(false);
-                setActiveTab('dashboard');
-              }}
-              icon={<Box size={20} />}
-              label="Laboratori"
-            />
-            <NavItem 
-              active={activeTab === 'finances'} 
-              onClick={() => setActiveTab('finances')}
-              icon={<TrendingUp size={20} />}
-              label="Cassa"
-            />
-            <NavItem 
-              active={activeTab === 'inventory'} 
-              onClick={() => setActiveTab('inventory')}
-              icon={<Package size={20} />}
-              label="Materiale Lab"
-            />
-            <NavItem 
-              active={activeTab === 'archive'} 
-              onClick={() => {
-                setViewingArchive(true);
-                setActiveTab('archive');
-              }}
-              icon={<Archive size={20} />}
-              label="Magazzino"
-            />
           </>
         )}
       </nav>
