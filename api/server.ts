@@ -1,6 +1,6 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
-import { neon } from "@neondatabase/serverless";
+import { neon, neonConfig } from "@neondatabase/serverless";
 import path from "path";
 import { fileURLToPath } from "url";
 import * as dotenv from "dotenv";
@@ -13,21 +13,25 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Support both DATABASE_URL and STORAGE_URL (in case user made a typo)
-const DB_URL = process.env.DATABASE_URL || process.env.STORAGE_URL || "";
-const sql = neon(DB_URL);
 const JWT_SECRET = process.env.JWT_SECRET || "labmanager-secret-key-123";
+
+// Helper for SQL to avoid "string did not match pattern" error on startup
+const getSql = () => {
+  const url = process.env.DATABASE_URL || process.env.STORAGE_URL;
+  if (!url) {
+    throw new Error("Mancano le credenziali del database (DATABASE_URL o STORAGE_URL). Verificale su Vercel!");
+  }
+  return neon(url);
+};
 
 let dbInitialized = false;
 
 async function initializeDatabase() {
   if (dbInitialized) return;
-  if (!DB_URL) {
-    console.error("ERRORE: DATABASE_URL non configurata!");
-    return;
-  }
-
-  console.log("Initializing Neon database schema lazy...");
+  
+  console.log("Initializing database schema...");
+  const sql = getSql();
+  
   try {
     await sql`CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username TEXT NOT NULL UNIQUE, password TEXT NOT NULL);`;
     await sql`CREATE TABLE IF NOT EXISTS laboratories (id SERIAL PRIMARY KEY, name TEXT NOT NULL, description TEXT);`;
@@ -43,7 +47,8 @@ async function initializeDatabase() {
     }
     dbInitialized = true;
   } catch (err) {
-    console.error("Database lazy-init failed:", err);
+    console.error("Database initialization failed:", err);
+    throw err;
   }
 }
 
@@ -51,43 +56,46 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 
-// Lazy-init DB on first request
+// Lazy-init DB and catch pattern errors
 app.use(async (req, res, next) => {
-  if (req.path.startsWith("/api") && !dbInitialized) {
-    await initializeDatabase();
-  }
-  next();
-});
-
-// --- Health/Test Route ---
-app.get("/api/health", async (req, res) => {
-  try {
-    if (!DB_URL) throw new Error("URL Database mancante");
-    await sql`SELECT 1`;
-    res.json({ status: "ok", database: "connected", env: process.env.NODE_ENV, vercel: !!process.env.VERCEL });
-  } catch (err) {
-    res.status(500).json({ status: "error", database: "failed", error: (err as Error).message });
-  }
-});
-
-// --- Auth Middleware ---
-const authenticateToken = (req: any, res: any, next: any) => {
-  const token = req.cookies.token;
-  if (!token) return res.status(401).json({ error: "Access denied" });
-  try {
-    const verified = jwt.verify(token, JWT_SECRET);
-    req.user = verified;
+  if (req.path.startsWith("/api") && req.path !== "/api/health") {
+    try {
+      if (!dbInitialized) await initializeDatabase();
+      next();
+    } catch (err) {
+      res.status(500).json({ 
+        error: (err as Error).message.includes("pattern") 
+          ? "URL del database non valido. Assicurati di aver copiato correttamente la stringa di Neon in DATABASE_URL nelle impostazioni di Vercel." 
+          : (err as Error).message 
+      });
+    }
+  } else {
     next();
-  } catch (err) {
-    res.status(400).json({ error: "Invalid token" });
   }
-};
+});
+
+// --- Health/Debug Route ---
+app.get("/api/health", async (req, res) => {
+  const url = process.env.DATABASE_URL || process.env.STORAGE_URL;
+  try {
+    if (!url) throw new Error("Variabile DATABASE_URL mancante su Vercel!");
+    const sql = neon(url);
+    await sql`SELECT 1`;
+    res.json({ status: "ok", database: "connected", mode: process.env.NODE_ENV });
+  } catch (err) {
+    res.status(500).json({ 
+      status: "error", 
+      error: (err as Error).message,
+      tip: "Assicurati di aver aggiunto DATABASE_URL nelle impostazioni (Environment Variables) del progetto su Vercel."
+    });
+  }
+});
 
 // --- Auth Routes ---
 app.post("/api/auth/register", async (req, res) => {
   const { username, password } = req.body;
   try {
-    if (!username || !password) return res.status(400).json({ error: "Dati mancanti" });
+    const sql = getSql();
     const existing = await sql`SELECT id FROM users WHERE username = ${username}`;
     if (existing.length > 0) return res.status(400).json({ error: "Username già esistente" });
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -97,13 +105,14 @@ app.post("/api/auth/register", async (req, res) => {
     res.cookie("token", token, { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 });
     res.json({ id: user.id, username: user.username });
   } catch (err) {
-    res.status(500).json({ error: "Errore DB: " + (err as Error).message });
+    res.status(500).json({ error: (err as Error).message });
   }
 });
 
 app.post("/api/auth/login", async (req, res) => {
   const { username, password } = req.body;
   try {
+    const sql = getSql();
     const userResult = await sql`SELECT * FROM users WHERE username = ${username}`;
     const user = userResult[0];
     if (!user) return res.status(400).json({ error: "Utente non trovato" });
@@ -113,7 +122,7 @@ app.post("/api/auth/login", async (req, res) => {
     res.cookie("token", token, { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 });
     res.json({ id: user.id, username: user.username });
   } catch (err) {
-    res.status(500).json({ error: "Errore login DB: " + (err as Error).message });
+    res.status(500).json({ error: (err as Error).message });
   }
 });
 
@@ -133,28 +142,39 @@ app.get("/api/auth/me", (req, res) => {
   }
 });
 
-// --- API Routes (Protected) ---
-app.get("/api/laboratories", authenticateToken, async (req, res) => {
+// --- API Protected Wrapper ---
+const authenticateToken = (req: any, res: any, next: any) => {
+  const token = req.cookies.token;
+  if (!token) return res.status(401).json({ error: "Access denied" });
   try {
-    const labs = await sql`SELECT * FROM laboratories`;
-    const labsWithSummary = await Promise.all(labs.map(async (lab) => {
-      const incomeResult = await sql`SELECT SUM(amount) as total FROM income WHERE laboratory_id = ${lab.id}`;
-      const expenseResult = await sql`SELECT SUM(amount) as total FROM expenses WHERE laboratory_id = ${lab.id}`;
-      return { ...lab, netProfit: Number(incomeResult[0]?.total || 0) - Number(expenseResult[0]?.total || 0) };
-    }));
-    res.json(labsWithSummary);
-  } catch (e) { res.status(500).json({ error: (e as Error).message }); }
+    req.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch (err) {
+    res.status(400).json({ error: "Invalid token" });
+  }
+};
+
+app.get("/api/laboratories", authenticateToken, async (req, res) => {
+  const sql = getSql();
+  const labs = await sql`SELECT * FROM laboratories`;
+  const labsWithSummary = await Promise.all(labs.map(async (lab) => {
+    const inc = await sql`SELECT SUM(amount) as total FROM income WHERE laboratory_id = ${lab.id}`;
+    const exp = await sql`SELECT SUM(amount) as total FROM expenses WHERE laboratory_id = ${lab.id}`;
+    return { ...lab, netProfit: Number(inc[0]?.total || 0) - Number(exp[0]?.total || 0) };
+  }));
+  res.json(labsWithSummary);
 });
 
 app.post("/api/laboratories", authenticateToken, async (req, res) => {
+  const sql = getSql();
   const { name, description } = req.body;
   const result = await sql`INSERT INTO laboratories (name, description) VALUES (${name}, ${description}) RETURNING id`;
   res.json({ id: result[0].id });
 });
 
 app.delete("/api/laboratories/:id", authenticateToken, async (req, res) => {
-  const { id } = req.params;
-  const labId = parseInt(id);
+  const sql = getSql();
+  const labId = parseInt(req.params.id);
   await sql`DELETE FROM materials WHERE laboratory_id = ${labId}`;
   await sql`DELETE FROM income WHERE laboratory_id = ${labId}`;
   await sql`DELETE FROM expenses WHERE laboratory_id = ${labId}`;
@@ -163,55 +183,51 @@ app.delete("/api/laboratories/:id", authenticateToken, async (req, res) => {
 });
 
 app.get("/api/materials", authenticateToken, async (req, res) => {
-  const { laboratory_id } = req.query;
-  const rows = await sql`SELECT * FROM materials WHERE laboratory_id = ${parseInt(laboratory_id as string)}`;
-  res.json(rows);
+  const sql = getSql();
+  res.json(await sql`SELECT * FROM materials WHERE laboratory_id = ${parseInt(req.query.laboratory_id as string)}`);
 });
 
 app.post("/api/materials", authenticateToken, async (req, res) => {
+  const sql = getSql();
   const { laboratory_id, name, unit, total_quantity, unit_cost, location } = req.body;
-  try {
-    const result = await sql`INSERT INTO materials (laboratory_id, name, unit, total_quantity, used_quantity, unit_cost, location) VALUES (${laboratory_id}, ${name}, ${unit}, ${total_quantity}, 0, ${unit_cost}, ${location}) RETURNING id`;
-    const newId = result[0].id;
-    await sql`INSERT INTO expenses (laboratory_id, category, description, amount, date, material_id) VALUES (${laboratory_id}, 'material_purchase', ${`Acquisto: ${name}`}, ${total_quantity * unit_cost}, ${new Date().toISOString()}, ${newId})`;
-    res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: (e as Error).message }); }
+  const result = await sql`INSERT INTO materials (laboratory_id, name, unit, total_quantity, used_quantity, unit_cost, location) VALUES (${laboratory_id}, ${name}, ${unit}, ${total_quantity}, 0, ${unit_cost}, ${location}) RETURNING id`;
+  await sql`INSERT INTO expenses (laboratory_id, category, description, amount, date, material_id) VALUES (${laboratory_id}, 'material_purchase', ${`Acquisto: ${name}`}, ${total_quantity * unit_cost}, ${new Date().toISOString()}, ${result[0].id})`;
+  res.json({ success: true });
 });
 
 app.patch("/api/materials/:id/usage", authenticateToken, async (req, res) => {
-  const { id } = req.params;
-  const { used_quantity } = req.body;
-  await sql`UPDATE materials SET used_quantity = used_quantity + ${used_quantity} WHERE id = ${parseInt(id)}`;
+  const sql = getSql();
+  await sql`UPDATE materials SET used_quantity = used_quantity + ${req.body.used_quantity} WHERE id = ${parseInt(req.params.id)}`;
   res.json({ success: true });
 });
 
 app.get("/api/income", authenticateToken, async (req, res) => {
-  const { laboratory_id } = req.query;
-  const rows = await sql`SELECT * FROM income WHERE laboratory_id = ${parseInt(laboratory_id as string)} ORDER BY date DESC`;
-  res.json(rows);
+  const sql = getSql();
+  res.json(await sql`SELECT * FROM income WHERE laboratory_id = ${parseInt(req.query.laboratory_id as string)} ORDER BY date DESC`);
 });
 
 app.post("/api/income", authenticateToken, async (req, res) => {
+  const sql = getSql();
   const { laboratory_id, description, amount, date } = req.body;
   await sql`INSERT INTO income (laboratory_id, description, amount, date) VALUES (${laboratory_id}, ${description}, ${amount}, ${date || new Date().toISOString()})`;
   res.json({ success: true });
 });
 
 app.get("/api/expenses", authenticateToken, async (req, res) => {
-  const { laboratory_id } = req.query;
-  const rows = await sql`SELECT * FROM expenses WHERE laboratory_id = ${parseInt(laboratory_id as string)} ORDER BY date DESC`;
-  res.json(rows);
+  const sql = getSql();
+  res.json(await sql`SELECT * FROM expenses WHERE laboratory_id = ${parseInt(req.query.laboratory_id as string)} ORDER BY date DESC`);
 });
 
 app.post("/api/expenses", authenticateToken, async (req, res) => {
+  const sql = getSql();
   const { laboratory_id, category, description, amount, date } = req.body;
   await sql`INSERT INTO expenses (laboratory_id, category, description, amount, date) VALUES (${laboratory_id}, ${category}, ${description}, ${amount}, ${date || new Date().toISOString()})`;
   res.json({ success: true });
 });
 
 app.get("/api/summary", authenticateToken, async (req, res) => {
-  const { laboratory_id } = req.query;
-  const labId = parseInt(laboratory_id as string);
+  const sql = getSql();
+  const labId = parseInt(req.query.laboratory_id as string);
   const inc = await sql`SELECT SUM(amount) as total FROM income WHERE laboratory_id = ${labId}`;
   const exp = await sql`SELECT SUM(amount) as total FROM expenses WHERE laboratory_id = ${labId}`;
   const mat = await sql`SELECT SUM(amount) as total FROM expenses WHERE laboratory_id = ${labId} AND category = 'material_purchase'`;
@@ -229,21 +245,16 @@ app.get("/api/summary", authenticateToken, async (req, res) => {
   });
 });
 
-// Production serving
-if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
-  const vite = await createViteServer({ server: { middlewareMode: true, hmr: { port: 24685 } }, appType: "spa" });
-  app.use(vite.middlewares);
-} else {
-  // In Vercel, static files are served by the platform automatically
-  // Local production check
-  if (!process.env.VERCEL) {
-    app.use(express.static(path.join(__dirname, "../dist")));
-    app.get("*", (req, res) => res.sendFile(path.join(__dirname, "../dist", "index.html")));
-  }
-}
-
-// Local listen
+// Serve frontend only in local dev/prod
 if (!process.env.VERCEL) {
+  if (process.env.NODE_ENV !== "production") {
+    const vite = await createViteServer({ server: { middlewareMode: true, hmr: { port: 24685 } }, appType: "spa" });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(__dirname, "../dist");
+    app.use(express.static(distPath));
+    app.get("*", (req, res) => res.sendFile(path.join(distPath, "index.html")));
+  }
   const PORT = process.env.PORT || 3005;
   app.listen(PORT, () => console.log(`Server at http://localhost:${PORT}`));
 }
