@@ -613,7 +613,10 @@ export default function App() {
           <div className="brand-logo p-1.5">
             <LayoutDashboard className="text-white w-5 h-5" />
           </div>
-          <span style={{ fontFamily: 'Nunito, sans-serif' }} className="font-black text-lg text-warm-900">LabManager</span>
+          <div>
+            <div style={{ fontFamily: 'Nunito, sans-serif' }} className="font-black text-lg text-warm-900 leading-none">LabManager</div>
+            <div className="text-[10px] text-sage-600 font-bold uppercase tracking-wider">{user?.username}</div>
+          </div>
         </div>
         <button onClick={handleLogout} className="logout-btn" title="Esci">
           <LogOut size={20} />
@@ -629,7 +632,7 @@ export default function App() {
           </div>
           <div>
             <div style={{ fontFamily: 'Nunito, sans-serif' }} className="font-black text-lg text-warm-900 leading-none">LabManager</div>
-            <div className="text-[10px] text-warm-400 font-medium">Gestione Laboratori</div>
+            <div className="text-[11px] text-sage-600 font-bold uppercase tracking-wider mt-0.5">User: {user?.username}</div>
           </div>
         </div>
 
@@ -1117,6 +1120,14 @@ export default function App() {
       </main>
 
       {/* Modals */}
+      <Modal show={showLabForm} onClose={() => setShowLabForm(false)} title="🌿 Nuovo Laboratorio">
+        <form onSubmit={handleAddLab} className="space-y-4">
+          <Input label="Nome Laboratorio" name="name" required placeholder="es. Laboratorio Ceramica" />
+          <Input label="Descrizione" name="description" placeholder="es. Produzione oggettistica e corsi" />
+          <button type="submit" className="btn-primary w-full">Crea Laboratorio</button>
+        </form>
+      </Modal>
+
       <Modal 
         show={showMaterialForm} 
         onClose={() => {
