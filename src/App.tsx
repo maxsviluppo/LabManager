@@ -31,7 +31,11 @@ import {
   Lock,
   User,
   Eye,
-  EyeOff
+  EyeOff,
+  Info,
+  HelpCircle,
+  PlayCircle,
+  Mail
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -51,6 +55,8 @@ export default function App() {
   const [laboratories, setLaboratories] = useState<Laboratory[]>([]);
   const [selectedLab, setSelectedLab] = useState<Laboratory | null>(null);
   const [viewingArchive, setViewingArchive] = useState(false);
+  const [viewingInfo, setViewingInfo] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [archiveMaterials, setArchiveMaterials] = useState<ArchiveMaterial[]>([]);
   const [income, setIncome] = useState<Income[]>([]);
@@ -652,9 +658,9 @@ export default function App() {
         </div>
 
         {/* Nav items */}
-        <NavItem active={!selectedLab && !viewingArchive} onClick={() => { setSelectedLab(null); setViewingArchive(false); }} icon={<Home size={18} />} label="Home" />
+        <NavItem active={!selectedLab && !viewingArchive && !viewingInfo} onClick={() => { setSelectedLab(null); setViewingArchive(false); setViewingInfo(false); }} icon={<Home size={18} />} label="Home" />
 
-        {!viewingArchive ? (
+        {!viewingArchive && !viewingInfo ? (
           <>
             {selectedLab && (
               <>
@@ -663,22 +669,31 @@ export default function App() {
                 <NavItem active={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} icon={<Package size={18} />} label="Materiali Lab" />
               </>
             )}
-            <NavItem active={false} onClick={() => { setViewingArchive(true); setActiveTab('archive'); }} icon={<Archive size={18} />} label="Magazzino" />
+            {!selectedLab && (
+              <NavItem active={false} onClick={() => { setViewingArchive(true); setActiveTab('archive'); }} icon={<Archive size={18} />} label="Magazzino" />
+            )}
           </>
-        ) : (
+        ) : viewingArchive ? (
           <>
             <NavItem active={activeTab === 'archive'} onClick={() => setActiveTab('archive')} icon={<Archive size={18} />} label="Magazzino" />
             {selectedLab && (
               <NavItem active={false} onClick={() => { setViewingArchive(false); setActiveTab('dashboard'); }} icon={<LayoutDashboard size={18} />} label="Torna al Lab" />
             )}
           </>
+        ) : (
+          <NavItem active={true} onClick={() => setViewingInfo(true)} icon={<Info size={18} />} label="Info" />
+        )}
+
+        {/* Info button only on Home (when no lab selected and not in archive) */}
+        {!selectedLab && !viewingArchive && !viewingInfo && (
+          <NavItem active={false} onClick={() => { setViewingInfo(true); setViewingArchive(false); setSelectedLab(null); }} icon={<Info size={18} />} label="Info" />
         )}
       </nav>
 
       {/* Main Content */}
       <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
         <AnimatePresence mode="wait">
-          {!selectedLab && !viewingArchive && (
+          {!selectedLab && !viewingArchive && !viewingInfo && (
             <motion.div key="home" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }} className="space-y-10">
               <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-5">
                 <div>
@@ -1116,6 +1131,79 @@ export default function App() {
               </div>
             </motion.div>
           )}
+
+          {viewingInfo && (
+            <motion.div 
+              key="info" 
+              initial={{ opacity: 0, y: 20 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              exit={{ opacity: 0, scale: 0.95 }} 
+              transition={{ duration: 0.4, ease: "easeOut" }} 
+              className="space-y-10"
+            >
+              <header className="text-center space-y-3 py-4">
+                <div className="inline-flex p-4 rounded-3xl bg-sage-50 border border-sage-100 mb-2">
+                  <Info size={36} className="text-sage-600" />
+                </div>
+                <h2 className="section-title text-3xl font-black">Informazioni e Supporto</h2>
+                <p className="text-warm-500 max-w-xl mx-auto">Tutto quello che c'è da sapere per gestire al meglio il tuo laboratorio creativo.</p>
+              </header>
+
+              <div className="flex justify-center">
+                <button 
+                  onClick={() => setShowTutorial(true)}
+                  className="glass-card p-8 flex flex-col items-center text-center gap-4 hover:border-sage-300 transition-all group max-w-sm w-full"
+                >
+                  <div className="w-16 h-16 rounded-full bg-sage-50 flex items-center justify-center text-sage-600 group-hover:bg-sage-100 group-hover:scale-110 transition-all">
+                    <PlayCircle size={32} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-warm-900 mb-1">Guida Rapida</h3>
+                    <p className="text-sm text-warm-500">Scopri come usare ogni sezione dell'app in pochi passi.</p>
+                  </div>
+                </button>
+              </div>
+
+              <div className="glass-card p-10 overflow-hidden relative">
+                <div className="absolute top-0 right-0 p-6 opacity-5 pointer-events-none">
+                  <HelpCircle size={160} className="text-warm-900" />
+                </div>
+                
+                <div className="space-y-6 relative z-10">
+                  <h3 className="text-2xl font-black text-warm-900 flex items-center gap-2">
+                    <History size={24} className="text-sage-500" />
+                    Info Progetto
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    <p className="text-warm-700 leading-relaxed font-medium">
+                      Lab Manager è l'applicativo ideale per le scuole dell'infanzia e istituti scolastici per la gestione dei laboratori creativi e delle attività didattiche dei bambini. Uno strumento completo che permette di gestire più laboratori contemporaneamente, monitorare i materiali in magazzino e in uso, e coordinare tutta la parte economica e amministrativa in modo semplice e intuitivo.
+                    </p>
+                    
+                    <div className="bg-sage-600/5 rounded-2xl p-6 border border-sage-600/10 space-y-2">
+                      <p className="text-warm-800 font-bold text-lg">Lab Manager realizzata da Castro Massimo</p>
+                      <p className="text-warm-500 text-sm font-bold uppercase tracking-widest">versione 1.0 • anno 2026</p>
+                    </div>
+
+                    <div className="pt-8 flex flex-col items-center text-center gap-3">
+                      <div className="p-3 bg-sage-50 text-sage-600 rounded-full">
+                        <Mail size={24} />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-warm-400 text-sm italic">Per informazioni, sviluppo di app personalizzate o giochi:</p>
+                        <a 
+                          href="mailto:castromassimo@gmail.com" 
+                          className="text-sage-600 font-black text-lg hover:text-sage-700 transition-colors flex items-center justify-center gap-2 underline decoration-sage-200 underline-offset-4"
+                        >
+                          castromassimo@gmail.com
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
         </AnimatePresence>
       </main>
 
@@ -1345,6 +1433,40 @@ export default function App() {
           </div>
           <button type="submit" className="btn-primary w-full">Salva Modifiche</button>
         </form>
+      </Modal>
+
+      {/* Tutorial Modal */}
+      <Modal show={showTutorial} onClose={() => setShowTutorial(false)} title="📖 Tutorial LabManager">
+        <div className="space-y-6 py-2">
+          <section className="space-y-3">
+            <h4 className="font-black text-sage-600 flex items-center gap-2 italic">1. Creare un Laboratorio</h4>
+            <p className="text-sm text-warm-700">Inizia dalla Home cliccando su <strong>"Nuovo Lab"</strong>. Assegna un nome e una descrizione. Ogni lab è un'unità di produzione indipendente.</p>
+          </section>
+
+          <section className="space-y-3">
+            <h4 className="font-black text-sage-600 flex items-center gap-2 italic">2. Panoramica & Dashboard</h4>
+            <p className="text-sm text-warm-700">Entrando in un laboratorio, la <strong>Panoramica</strong> ti mostra subito l'utile netto, il grafico delle uscite e gli avvisi per i materiali che stanno finendo.</p>
+          </section>
+
+          <section className="space-y-3">
+            <h4 className="font-black text-sage-600 flex items-center gap-2 italic">3. Cassa (Entrate e Uscite)</h4>
+            <p className="text-sm text-warm-700">Nella sezione <strong>Cassa</strong> registri i guadagni (quote, vendite) e le uscite (stipendi, affitti, acquisti vari). Il sistema calcola automaticamente il bilancio.</p>
+          </section>
+
+          <section className="space-y-3">
+            <h4 className="font-black text-sage-600 flex items-center gap-2 italic">4. Gestione Materiali Lab</h4>
+            <p className="text-sm text-warm-700">In <strong>Materiali Lab</strong> inserisci quello che compri specificamente per il lab. Puoi registrare quanto materiale usi: il costo viene scalato dalle entrate e la giacenza aggiornata nel lab e nell'archivio.</p>
+          </section>
+
+          <section className="space-y-3">
+            <h4 className="font-black text-sage-600 flex items-center gap-2 italic">5. Magazzino (Scorta Centrale)</h4>
+            <p className="text-sm text-warm-700">Il <strong>Magazzino</strong> è la tua scorta globale. Qui carichi grandi acquisti e puoi <strong>"Inviare al Lab"</strong> le quantità specifiche. Se un lab viene chiuso, il materiale non usato resta disponibile qui per altri laboratori.</p>
+          </section>
+          
+          <div className="pt-4">
+            <button onClick={() => setShowTutorial(false)} className="btn-primary w-full py-4 rounded-2xl font-black">Ho capito, andiamo!</button>
+          </div>
+        </div>
       </Modal>
     </div>
   );
