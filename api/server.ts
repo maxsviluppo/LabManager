@@ -144,16 +144,41 @@ app.get("/api/materials", authMiddleware, wrap(async (req, res) => {
 
 app.post("/api/materials", authMiddleware, wrap(async (req, res) => {
   const sql = getSql();
-  const { laboratory_id, name, unit, total_quantity, used_quantity, unit_cost, location, archive_id } = req.body;
-  const r = await sql`INSERT INTO materials (laboratory_id, name, unit, total_quantity, used_quantity, unit_cost, location, archive_id) VALUES (${laboratory_id}, ${name}, ${unit}, ${total_quantity}, ${used_quantity || 0}, ${unit_cost}, ${location}, ${archive_id || null}) RETURNING id`;
+  const { laboratory_id, name, unit, total_quantity, unit_cost, location } = req.body;
+  
+  // 1. Sync with Archive (Magazzino)
+  let archive = await sql`SELECT id FROM material_archive WHERE name = ${name}`;
+  let final_archive_id;
+  if (archive[0]) {
+    final_archive_id = archive[0].id;
+    await sql`UPDATE material_archive SET quantity = quantity + ${total_quantity} WHERE id = ${final_archive_id}`;
+  } else {
+    const archRes = await sql`INSERT INTO material_archive (name, unit, quantity) VALUES (${name}, ${unit}, ${total_quantity}) RETURNING id`;
+    final_archive_id = archRes[0].id;
+  }
+
+  // 2. Add to Lab
+  const r = await sql`INSERT INTO materials (laboratory_id, name, unit, total_quantity, used_quantity, unit_cost, location, archive_id) VALUES (${laboratory_id}, ${name}, ${unit}, ${total_quantity}, 0, ${unit_cost}, ${location}, ${final_archive_id}) RETURNING id`;
+  
+  // 3. Register Expense
   await sql`INSERT INTO expenses (laboratory_id, category, description, amount, date, material_id) VALUES (${laboratory_id}, 'material_purchase', ${`Acquisto: ${name}`}, ${total_quantity * unit_cost}, ${new Date().toISOString()}, ${r[0].id})`;
+  
   res.json({ success: true });
 }));
 
 app.put("/api/materials/:id", authMiddleware, wrap(async (req, res) => {
   const sql = getSql();
+  const id = parseInt(req.params.id);
   const { name, unit, total_quantity, used_quantity, unit_cost, location } = req.body;
-  await sql`UPDATE materials SET name=${name}, unit=${unit}, total_quantity=${total_quantity}, used_quantity=${used_quantity}, unit_cost=${unit_cost}, location=${location} WHERE id=${parseInt(req.params.id)}`;
+  
+  // Update archive if linked
+  const current = await sql`SELECT archive_id, total_quantity FROM materials WHERE id = ${id}`;
+  if (current[0]?.archive_id) {
+    const delta = Number(total_quantity) - Number(current[0].total_quantity);
+    await sql`UPDATE material_archive SET quantity = quantity + ${delta} WHERE id = ${current[0].archive_id}`;
+  }
+  
+  await sql`UPDATE materials SET name=${name}, unit=${unit}, total_quantity=${total_quantity}, used_quantity=${used_quantity}, unit_cost=${unit_cost}, location=${location} WHERE id=${id}`;
   res.json({ success: true });
 }));
 
@@ -163,13 +188,24 @@ app.patch("/api/materials/:id/usage", authMiddleware, wrap(async (req, res) => {
   const { used_quantity } = req.body;
   await sql`UPDATE materials SET used_quantity = used_quantity + ${used_quantity} WHERE id = ${id}`;
   const m = await sql`SELECT archive_id FROM materials WHERE id=${id}`;
-  if (m[0]?.archive_id) await sql`UPDATE material_archive SET quantity = quantity - ${used_quantity} WHERE id = ${m[0].archive_id}`;
+  if (m[0]?.archive_id) {
+    await sql`UPDATE material_archive SET quantity = quantity - ${used_quantity} WHERE id = ${m[0].archive_id}`;
+  }
   res.json({ success: true });
 }));
 
 app.delete("/api/materials/:id", authMiddleware, wrap(async (req, res) => {
   const sql = getSql();
   const id = parseInt(req.params.id);
+  
+  // Subtract remaining from archive on delete? 
+  // If a lab material is deleted, we assume it's removed from global stock too.
+  const m = await sql`SELECT archive_id, total_quantity, used_quantity FROM materials WHERE id = ${id}`;
+  if (m[0]?.archive_id) {
+    const remaining = Number(m[0].total_quantity) - Number(m[0].used_quantity);
+    await sql`UPDATE material_archive SET quantity = quantity - ${remaining} WHERE id = ${m[0].archive_id}`;
+  }
+
   await sql`DELETE FROM expenses WHERE material_id = ${id}`;
   await sql`DELETE FROM materials WHERE id = ${id}`;
   res.json({ success: true });

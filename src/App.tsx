@@ -613,7 +613,7 @@ export default function App() {
                 </div>
                 <div className="text-right">
                   <div className="text-[10px] uppercase font-black text-slate-400 tracking-widest flex items-center justify-end gap-1">
-                    <Landmark size={12} className="text-slate-400" /> Totale Utile Netto
+                    Totale Utile Netto
                   </div>
                   <div className={cn(
                     "font-bold text-lg",
@@ -805,21 +805,26 @@ export default function App() {
               exit={{ opacity: 0, y: -20 }}
               className="space-y-8"
             >
-              <header className="flex justify-between items-start">
+              <header className="flex flex-col sm:flex-row justify-between items-end gap-4">
                 <div>
                   <h2 className="text-3xl font-bold text-slate-900">Panoramica</h2>
                   <p className="text-slate-500">Stato attuale della tua attività</p>
                 </div>
+                <div className="text-right">
+                  <div className="text-[10px] uppercase font-black text-slate-400 tracking-widest mb-1">
+                    Totale Utile Netto
+                  </div>
+                  <div className={cn(
+                    "text-3xl font-black",
+                    (summary?.netProfit || 0) >= 0 ? "text-emerald-600" : "text-rose-600"
+                  )}>
+                    {formatCurrency(summary?.netProfit || 0)}
+                  </div>
+                </div>
               </header>
 
               {/* Summary Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <StatCard 
-                  title="Totale Utile Netto" 
-                  value={formatCurrency(summary?.netProfit || 0)} 
-                  icon={<Landmark className="text-blue-600" />}
-                  highlight={true}
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <StatCard 
                   title="Entrate Totali" 
                   value={formatCurrency(summary?.totalIncome || 0)} 
